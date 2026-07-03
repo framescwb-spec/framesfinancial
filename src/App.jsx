@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { jsPDF } from "jspdf";
 
 // ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
 const firebaseConfig = {
@@ -364,6 +365,7 @@ function AppContent({ onLogout, userEmail }) {
         if (m.dateInvoice === undefined) m.dateInvoice = "";
         if (m.dateReceived === undefined) m.dateReceived = "";
         if (!Array.isArray(m.payments)) m.payments = [];
+        if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
         if (m.status === "pendente") m.status = "fechado";
         return m;
       });
@@ -400,6 +402,56 @@ function AppContent({ onLogout, userEmail }) {
 
   const saveTimer = useRef(null);
   const [isSavingNow, setIsSavingNow] = useState(false);
+
+  const exportPdfSummary = () => {
+    const docPdf = new jsPDF();
+    const pageWidth = docPdf.internal.pageSize.getWidth();
+    let y = 20;
+
+    const addTitle = (text) => { docPdf.setFontSize(16); docPdf.setFont(undefined,"bold"); docPdf.text(text, 14, y); y += 8; };
+    const addSubtitle = (text) => { docPdf.setFontSize(11); docPdf.setFont(undefined,"normal"); docPdf.setTextColor(100); docPdf.text(text, 14, y); docPdf.setTextColor(0); y += 8; };
+    const addSectionHeader = (text) => { y += 4; docPdf.setFontSize(13); docPdf.setFont(undefined,"bold"); docPdf.text(text, 14, y); y += 7; docPdf.setLineWidth(0.3); docPdf.line(14, y-4, pageWidth-14, y-4); };
+    const addLine = (label, value, indent=0) => {
+      if (y > 275) { docPdf.addPage(); y = 20; }
+      docPdf.setFontSize(10); docPdf.setFont(undefined,"normal");
+      docPdf.text(String(label), 14+indent, y);
+      docPdf.setFont(undefined,"bold");
+      docPdf.text(String(value), pageWidth-14, y, { align: "right" });
+      y += 6;
+    };
+
+    addTitle("🎥 FramesBR Financial System");
+    addSubtitle(`Resumo gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`);
+
+    addSectionHeader("Balanço Geral");
+    addLine("Saldo Atual", formatBRL(totals.balance));
+    addLine("Projetado Líquido (após NF)", formatBRL(totals.projected));
+    addLine("Total contratado (bruto)", formatBRL(totals.totalReceivables));
+    addLine("Já recebido", formatBRL(totals.received));
+    addLine("Cachês a pagar", formatBRL(totals.cachesAPagar));
+    addLine("Custo fixo mensal (estúdio + assinaturas)", formatBRL(totals.totalFixedMonthly));
+
+    addSectionHeader("Ranking de Clientes (por valor contratado)");
+    const rankedClients = clients.map(cl=>({cl,ct:clientTotals(cl.id)})).filter(({ct})=>ct.jobCount>0).sort((a,b)=>b.ct.totalValue-a.ct.totalValue);
+    if (rankedClients.length===0) addLine("Nenhum job lançado ainda.", "");
+    rankedClients.forEach(({cl,ct},i)=> addLine(`${i+1}. ${cl.name} (${ct.jobCount} job${ct.jobCount>1?"s":""})`, formatBRL(ct.totalValue)));
+
+    addSectionHeader("Ranking de Profissionais (por cachê recebido)");
+    const rankedFL = freelancers.map(fl=>{
+      const fc=caches.filter(c=>c.freelancerId===fl.id);
+      const total=fc.reduce((s,c)=>s+cacheTotal(c),0);
+      return {fl,total,jobs:fc.length};
+    }).filter(({total})=>total>0).sort((a,b)=>b.total-a.total);
+    if (rankedFL.length===0) addLine("Nenhum cachê lançado ainda.", "");
+    rankedFL.forEach(({fl,total,jobs},i)=> addLine(`${i+1}. ${fl.apelido||fl.name} (${jobs} job${jobs>1?"s":""})`, formatBRL(total)));
+
+    addSectionHeader("Vencimentos nos próximos 30 dias");
+    if (upcomingPayments.length===0) addLine("Nenhum vencimento nos próximos 30 dias.", "");
+    upcomingPayments.forEach(item => addLine(`${item.tipo}: ${item.desc} — ${item.datePay}`, formatBRL(item.value)));
+
+    docPdf.save(`framesbr-resumo-${today()}.pdf`);
+    logChange("Resumo PDF exportado");
+  };
 
   const runDiagnostic = async () => {
     setDiagRunning(true);
@@ -464,7 +516,7 @@ function AppContent({ onLogout, userEmail }) {
   const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true};
   const emptySub = {desc:"",value:"",category:SUB_CATEGORIES[0],cycle:"mensal",dayOfMonth:"1",dateStart:today(),active:true};
   const emptyClient = {name:""};
-  const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,dateWork:today(),dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
+  const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,dateWork:today(),workDates:[],dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
   const emptyReim = {pessoa:"",desc:"",value:"",tipo:"Adiantamento profissional",devolvidoPara:"Frames",datePay:"",status:"pendente"};
   const emptyFL = {name:"",apelido:"",role:ROLES[0],phone:"",email:"",cpf:"",rg:"",nasc:""};
   const emptyCache = {freelancerId:"",role:ROLES[0],desc:"",value:"",alimentacao:"",logistica:"",dateWork:today(),dateDue:"",datePaid:"",paymentMethod:"Pix/Transferência",status:"a pagar"};
@@ -629,7 +681,8 @@ function AppContent({ onLogout, userEmail }) {
   };
   const addJob=()=>{
     if(!formJob.desc||!formJob.value||!selectedClient)return;
-    setJobs(p=>[...p,{...formJob,id:Date.now(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate)}]);
+    const wd=(formJob.workDates||[]).slice().sort();
+    setJobs(p=>[...p,{...formJob,id:Date.now(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate),workDates:wd,dateWork:wd[0]||""}]);
     logChange(`Job adicionado: ${formJob.desc}`);
     setFormJob(emptyJob);setShowAddJob(false);
   };
@@ -688,7 +741,11 @@ function AppContent({ onLogout, userEmail }) {
         * { box-sizing: border-box; }
       `}</style>
       {editingId&&editingId.startsWith("client:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setClients(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome do cliente"}]}/>}
-      {editingId&&editingId.startsWith("job:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate)}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"valorRecebido",label:"Já recebido (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"dateWork",label:"📅 Realização (gravação)",type:"date"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
+      {editingId&&editingId.startsWith("job:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{
+        const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
+        setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
+        setEditingId(null);setEditData({});
+      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"valorRecebido",label:"Já recebido (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
       {editingId&&editingId.startsWith("reimb:")&&<EditModal editData={editData} setEditData={setEditData} color="#fb923c" onSave={()=>saveEdit("reimb",setReimbursements)} onCancel={cancelEdit} fields={[{key:"pessoa",label:"Pessoa"},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"devolvidoPara",label:"Devolvido para",type:"select",options:REIMB_SOURCES},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["pendente","recebido"]}]}/>}
       {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{setCaches(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),alimentacao:Number(editData.alimentacao||0),logistica:Number(editData.logistica||0)}:i));cancelEdit();}} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"dateWork",label:"📅 Data do trabalho",type:"date"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"Data do trabalho",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
@@ -720,6 +777,9 @@ function AppContent({ onLogout, userEmail }) {
               </button>
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
                 {isSavingNow?"Salvando...":"💾 Salvar agora"}
+              </button>
+              <button onClick={exportPdfSummary} style={{background:"#facc1522",border:"1px solid #facc1544",color:"#facc15",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                📄 Baixar Resumo PDF
               </button>
               <div style={{width:1,height:16,background:"#ffffff20"}}/>
               <span style={{fontSize:11,color:"#64748b"}}>{userEmail}</span>
@@ -1049,8 +1109,29 @@ function AppContent({ onLogout, userEmail }) {
               <FormCard title="Novo Projeto/Job" color="#a78bfa">
                 <Input label="Nome do projeto/job" value={formJob.desc} onChange={v=>setFormJob(p=>({...p,desc:v}))}/>
                 <Row><Input label="Valor total (R$)" type="number" value={formJob.value} onChange={v=>setFormJob(p=>({...p,value:v}))}/><Input label="Já recebido (R$)" type="number" value={formJob.valorRecebido} onChange={v=>setFormJob(p=>({...p,valorRecebido:v}))}/></Row>
-                <Row><Input label="📅 Realização (gravação)" type="date" value={formJob.dateWork} onChange={v=>setFormJob(p=>({...p,dateWork:v}))}/><Input label="📦 Entrega do material" type="date" value={formJob.dateDelivery} onChange={v=>setFormJob(p=>({...p,dateDelivery:v}))}/></Row>
-                <Row><Input label="🧾 Faturamento (NF)" type="date" value={formJob.dateInvoice} onChange={v=>setFormJob(p=>({...p,dateInvoice:v}))}/><Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>({...p,dateDueExpected:v}))}/></Row>
+                <div>
+                  <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>📅 Diárias de gravação (pode adicionar mais de uma)</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+                    {(formJob.workDates||[]).map((d,i)=>(
+                      <span key={i} style={{background:"#a78bfa22",border:"1px solid #a78bfa44",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#a78bfa",display:"flex",alignItems:"center",gap:6}}>
+                        {d}
+                        <button onClick={()=>setFormJob(p=>({...p,workDates:p.workDates.filter((_,x)=>x!==i)}))} style={{background:"transparent",border:"none",color:"#a78bfa",cursor:"pointer",fontSize:12,padding:0}}>✕</button>
+                      </span>
+                    ))}
+                    {(!formJob.workDates||formJob.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária adicionada ainda.</span>}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input type="date" id="newWorkDateInput" defaultValue={today()} style={{flex:1,background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}/>
+                    <button onClick={()=>{
+                      const input=document.getElementById("newWorkDateInput");
+                      const val=input.value;
+                      if(!val)return;
+                      setFormJob(p=>({...p,workDates:[...(p.workDates||[]),val].sort()}));
+                    }} style={{background:"#a78bfa",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Adicionar diária</button>
+                  </div>
+                </div>
+                <Row><Input label="📦 Entrega do material" type="date" value={formJob.dateDelivery} onChange={v=>setFormJob(p=>({...p,dateDelivery:v}))}/><Input label="🧾 Faturamento (NF)" type="date" value={formJob.dateInvoice} onChange={v=>setFormJob(p=>({...p,dateInvoice:v}))}/></Row>
+                <Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>({...p,dateDueExpected:v}))}/>
                 <Row>
                   <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Nota Fiscal</div>
                     <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
@@ -1081,13 +1162,13 @@ function AppContent({ onLogout, userEmail }) {
                         if(overdue>0) return <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",border:"1px solid #ef444444",borderRadius:5,padding:"2px 6px",marginLeft:8,fontWeight:700}}>🔴 Atrasado {overdue}d</span>;
                         return null;
                       })()}</div>
-                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{job.dateWork&&<span>📅 {job.dateWork}</span>}{job.dateDelivery&&<span> · 📦 {job.dateDelivery}</span>}{job.dateDueExpected&&<span> · 💰 prev. {job.dateDueExpected}</span>}{job.dateReceived&&<span style={{color:"#22c55e"}}> · ✅ {job.dateReceived}</span>}{job.nfRate>0&&<span> · NF {job.nfRate*100}%</span>}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{(job.workDates&&job.workDates.length>0)?<span>📅 {job.workDates.length>1?`${job.workDates.length} diárias (${job.workDates[0]} a ${job.workDates[job.workDates.length-1]})`:job.workDates[0]}</span>:(job.dateWork&&<span>📅 {job.dateWork}</span>)}{job.dateDelivery&&<span> · 📦 {job.dateDelivery}</span>}{job.dateDueExpected&&<span> · 💰 prev. {job.dateDueExpected}</span>}{job.dateReceived&&<span style={{color:"#22c55e"}}> · ✅ {job.dateReceived}</span>}{job.nfRate>0&&<span> · NF {job.nfRate*100}%</span>}</div>
                       {job.contrato&&<div style={{fontSize:10,color:"#475569",marginTop:2}}>📋 {job.contrato}</div>}
                       {job.notes&&<div style={{fontSize:10,color:"#475569",marginTop:1}}>💬 {job.notes}</div>}
                     </div>
                     <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(job.value)}</div>
                     <button onClick={(e)=>{e.stopPropagation();toggleStatus(jobs,setJobs,job.id,JOB_STATUS);}} style={{background:statusColor[job.status]+"22",color:statusColor[job.status],border:`1px solid ${statusColor[job.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{job.status}</button>
-                    <button onClick={(e)=>{e.stopPropagation();startEdit("job",job);}} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                    <button onClick={(e)=>{e.stopPropagation();startEdit("job",{...job,workDatesText:(job.workDates||[]).join(", ")});}} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
                     <button onClick={(e)=>{e.stopPropagation();removeJob(job.id);}} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                   </div>
                   <div style={{display:"flex",gap:12,fontSize:11,color:"#64748b",paddingTop:6,borderTop:"1px solid #ffffff08"}}>
