@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 // ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
 const firebaseConfig = {
@@ -19,7 +19,14 @@ const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConf
 // travadas para sempre sem nunca dar erro nem sucesso.
 const db = getFirestore(firebaseApp, "financial");
 const auth = getAuth(firebaseApp);
-const DOC_REF = doc(db, "produtora", "framesbr");
+// Cada usuário logado tem seu PRÓPRIO documento, identificado pelo UID
+// (identificador único) da conta dele no Firebase Authentication — assim
+// os dados de uma pessoa/empresa nunca se misturam com os de outra.
+let currentUid = null;
+function getDocRef() {
+  if (!currentUid) throw new Error("Usuário não autenticado ainda.");
+  return doc(db, "produtora", currentUid);
+}
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
 const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Gasolina","Gastos extras","Outro"];
@@ -216,7 +223,7 @@ function hashData(data) {
 
 async function loadFromStorage(defaults) {
   try {
-    const snap = await withTimeout(getDoc(DOC_REF), 10000, "carregar dados");
+    const snap = await withTimeout(getDoc(getDocRef()), 10000, "carregar dados");
     if (snap.exists()) {
       const saved = snap.data();
       lastSavedHash = hashData(saved);
@@ -254,7 +261,7 @@ async function saveToStorage(data) {
   try {
     const newHash = hashData(data);
     if (newHash === lastSavedHash) return true; // nothing changed, already saved
-    await withTimeout(setDoc(DOC_REF, data, { merge: false }), 10000, "salvar dados");
+    await withTimeout(setDoc(getDocRef(), data, { merge: false }), 10000, "salvar dados");
     lastSavedHash = newHash;
     if(onStorageError) onStorageError(null);
     return true;
@@ -399,7 +406,7 @@ function AppContent({ onLogout, userEmail }) {
     setDiagResult(null);
     const testValue = `teste-${Date.now()}`;
     try {
-      const testRef = doc(db, "produtora", "_diagnostico");
+      const testRef = doc(db, "produtora", currentUid, "_meta", "diagnostico");
       await withTimeout(setDoc(testRef, { marker: testValue, ts: new Date().toISOString() }), 8000, "escrever teste");
       const snap = await withTimeout(getDoc(testRef), 8000, "ler teste");
       if (snap.exists() && snap.data().marker === testValue) {
@@ -1487,10 +1494,22 @@ function AppContent({ onLogout, userEmail }) {
 
 // ── Tela de login ──
 function LoginScreen({ onLoginSuccess }) {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const errorMessages = {
+    "auth/invalid-email": "E-mail inválido.",
+    "auth/user-not-found": "Usuário não encontrado.",
+    "auth/wrong-password": "Senha incorreta.",
+    "auth/invalid-credential": "E-mail ou senha incorretos.",
+    "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente de novo.",
+    "auth/email-already-in-use": "Já existe uma conta com esse e-mail. Tente entrar em vez de criar conta.",
+    "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -1500,25 +1519,43 @@ function LoginScreen({ onLoginSuccess }) {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       onLoginSuccess();
     } catch (err) {
-      const messages = {
-        "auth/invalid-email": "E-mail inválido.",
-        "auth/user-not-found": "Usuário não encontrado.",
-        "auth/wrong-password": "Senha incorreta.",
-        "auth/invalid-credential": "E-mail ou senha incorretos.",
-        "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente de novo.",
-      };
-      setError(messages[err.code] || `Erro ao entrar: ${err.code || err.message}`);
+      setError(errorMessages[err.code] || `Erro ao entrar: ${err.code || err.message}`);
+    }
+    setLoading(false);
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (password !== confirmPassword) {
+      setError("As senhas não são iguais.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      onLoginSuccess();
+    } catch (err) {
+      setError(errorMessages[err.code] || `Erro ao criar conta: ${err.code || err.message}`);
     }
     setLoading(false);
   };
 
   return (
     <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <form onSubmit={handleLogin} style={{background:"#1e1e2e",border:"1px solid #ffffff12",borderRadius:16,padding:32,width:"100%",maxWidth:360}}>
+      <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"#1e1e2e",border:"1px solid #ffffff12",borderRadius:16,padding:32,width:"100%",maxWidth:360}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{fontSize:36,marginBottom:8}}>🎥</div>
           <h1 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>FramesBR <span style={{color:"#a78bfa"}}>Financial System</span></h1>
-          <p style={{margin:"6px 0 0",fontSize:12,color:"#64748b"}}>Faça login para continuar</p>
+          <p style={{margin:"6px 0 0",fontSize:12,color:"#64748b"}}>{mode==="login"?"Faça login para continuar":"Crie sua conta gratuita"}</p>
+        </div>
+        <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4,marginBottom:20}}>
+          <button type="button" onClick={()=>{setMode("login");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="login"?"#a78bfa":"transparent",color:mode==="login"?"#fff":"#64748b"}}>Entrar</button>
+          <button type="button" onClick={()=>{setMode("signup");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="signup"?"#a78bfa":"transparent",color:mode==="signup"?"#fff":"#64748b"}}>Criar conta</button>
         </div>
         {error && <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#fca5a5"}}>{error}</div>}
         <div style={{marginBottom:12}}>
@@ -1526,14 +1563,22 @@ function LoginScreen({ onLoginSuccess }) {
           <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"
             style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
-        <div style={{marginBottom:20}}>
+        <div style={{marginBottom:mode==="signup"?12:20}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Senha</div>
-          <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••"
+          <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" minLength={mode==="signup"?6:undefined}
             style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
+        {mode==="signup" && (
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Confirmar senha</div>
+            <input type="password" required value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="••••••••"
+              style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+        )}
         <button type="submit" disabled={loading} style={{width:"100%",background:"#a78bfa",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
-          {loading?"Entrando...":"Entrar"}
+          {loading?(mode==="login"?"Entrando...":"Criando conta..."):(mode==="login"?"Entrar":"Criar conta")}
         </button>
+        {mode==="signup" && <p style={{margin:"14px 0 0",fontSize:11,color:"#475569",textAlign:"center"}}>Sua conta começa com dados em branco, separados de qualquer outra conta.</p>}
       </form>
     </div>
   );
@@ -1544,7 +1589,10 @@ export default function App() {
   const [user, setUser] = useState(undefined); // undefined = checking, null = logged out, object = logged in
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
+    const unsub = onAuthStateChanged(auth, (u) => {
+      currentUid = u ? u.uid : null; // define para qual "gaveta" de dados este login aponta
+      setUser(u || null);
+    });
     return () => unsub();
   }, []);
 
@@ -1560,7 +1608,9 @@ export default function App() {
     return <LoginScreen onLoginSuccess={() => {}} />;
   }
 
-  return <AppContent onLogout={() => signOut(auth)} userEmail={user.email} />;
+  // key={user.uid} força recriar o AppContent do zero ao trocar de conta,
+  // evitando que dados de um usuário fiquem "grudados" na tela ao trocar de login.
+  return <AppContent key={user.uid} onLogout={() => signOut(auth)} userEmail={user.email} />;
 }
 
 
