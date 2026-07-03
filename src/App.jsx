@@ -12,7 +12,11 @@ const firebaseConfig = {
   appId: "1:488046203697:web:2f3ddda7b333d96c6c5610",
 };
 const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
+// IMPORTANTE: o banco de dados Firestore deste projeto NÃO se chama "(default)" —
+// ele foi criado com o nome "financial". É preciso passar esse nome explicitamente,
+// senão o SDK tenta conectar num banco que não existe e as escritas ficam
+// travadas para sempre sem nunca dar erro nem sucesso.
+const db = getFirestore(firebaseApp, "financial");
 const DOC_REF = doc(db, "produtora", "framesbr");
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
