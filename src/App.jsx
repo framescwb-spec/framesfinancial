@@ -30,7 +30,7 @@ function getDocRef() {
 }
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
-const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Gasolina","Gastos extras","Outro"];
+const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Hotel/Airbnb","Gasolina","Gastos extras","Outro"];
 const PAYMENT_SOURCES = ["Cartão Frames","Cartão Japa","Cartão Ivan","Dinheiro","Pix/Transferência"];
 const CATEGORIES_EXPENSE = ["Equipamento","Software","Marketing","Pessoal","Aluguel","Transporte","Outros"];
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -41,7 +41,7 @@ const today = () => new Date().toISOString().split("T")[0];
 const AVATAR_COLORS = ["#818cf8","#fb923c","#f472b6","#34d399","#22d3ee","#facc15","#a78bfa","#f87171","#4ade80","#38bdf8"];
 const getColor = (idx) => AVATAR_COLORS[Math.abs(idx) % AVATAR_COLORS.length];
 const SOURCE_COLOR = {"Cartão Frames":"#facc15","Cartão Japa":"#22d3ee","Cartão Ivan":"#f472b6","Dinheiro":"#34d399","Pix/Transferência":"#818cf8"};
-const TYPE_ICON = {"Logística":"🚛","Alimentação":"🍽️","Uber":"🚗","Voo":"✈️","Gasolina":"⛽","Gastos extras":"💳","Outro":"📦"};
+const TYPE_ICON = {"Logística":"🚛","Alimentação":"🍽️","Uber":"🚗","Voo":"✈️","Hotel/Airbnb":"🏨","Gasolina":"⛽","Gastos extras":"💳","Outro":"📦"};
 const monthKey = (d) => d ? d.slice(0,7) : null;
 const monthLabel = (key) => { if(!key) return "—"; const [y,m]=key.split("-"); return `${MONTHS_PT[parseInt(m)-1]}/${y}`; };
 
@@ -130,7 +130,6 @@ const DEFAULT_PROJ_EXPENSES = [
 ];
 
 const DEFAULT_STUDIO_EXPENSES = [];
-const DEFAULT_ACCOMMODATIONS = [];
 const DEFAULT_SUBSCRIPTIONS = [];
 const STUDIO_CATEGORIES = ["Aluguel","Internet","Energia","Água","Condomínio","Limpeza","Manutenção","Segurança","Outros"];
 const SUB_CATEGORIES = ["Design","Edição","IA","Cloud/Storage","Música","Hospedagem","Comunicação","Contabilidade","Outros"];
@@ -312,7 +311,6 @@ function AppContent({ onLogout, userEmail }) {
   const [projectExpenses, setProjectExpenses] = useState(DEFAULT_PROJ_EXPENSES);
   const [studioExpenses, setStudioExpenses] = useState(DEFAULT_STUDIO_EXPENSES);
   const [subscriptions, setSubscriptions] = useState(DEFAULT_SUBSCRIPTIONS);
-  const [accommodations, setAccommodations] = useState(DEFAULT_ACCOMMODATIONS);
 
   const applyLoadedData = (data) => {
     setExpenses(data.expenses);
@@ -390,11 +388,27 @@ function AppContent({ onLogout, userEmail }) {
     setCaches(mergedCaches);
 
     const savedProjExpIds = new Set(data.projectExpenses.map(e => e.id));
-    setProjectExpenses([...data.projectExpenses, ...DEFAULT_PROJ_EXPENSES.filter(e => !savedProjExpIds.has(e.id))].map(e => e.dateFim === undefined ? {...e, dateFim: ""} : e));
+    let mergedProjExp = [...data.projectExpenses, ...DEFAULT_PROJ_EXPENSES.filter(e => !savedProjExpIds.has(e.id))].map(e => e.dateFim === undefined ? {...e, dateFim: ""} : e);
+    // Migração: a antiga aba separada "Hotel/Airbnb" (accommodations) foi unificada
+    // dentro de "Despesas do Job" como um tipo de despesa. Qualquer hospedagem
+    // salva no formato antigo vira uma despesa comum, sem perder nenhum dado.
+    const legacyAccommodations = Array.isArray(data.accommodations) ? data.accommodations : [];
+    if (legacyAccommodations.length > 0) {
+      const migrated = legacyAccommodations.map(a => ({
+        id: a.id, jobId: a.jobId, type: "Hotel/Airbnb",
+        desc: a.nome || a.tipo || "", link: a.link || "", hospedes: a.hospedes || "",
+        value: Number(a.value || 0), source: a.source || PAYMENT_SOURCES[0],
+        paymentType: "à vista", parcelas: "1",
+        dateWork: a.checkIn || "", dateFim: a.checkOut || "", datePay: "",
+        status: a.status || "a pagar",
+      }));
+      const existingIds = new Set(mergedProjExp.map(e => e.id));
+      mergedProjExp = [...mergedProjExp, ...migrated.filter(e => !existingIds.has(e.id))];
+    }
+    setProjectExpenses(mergedProjExp);
 
     setStudioExpenses(Array.isArray(data.studioExpenses) ? data.studioExpenses : []);
     setSubscriptions(Array.isArray(data.subscriptions) ? data.subscriptions : []);
-    setAccommodations(Array.isArray(data.accommodations) ? data.accommodations : []);
   };
 
   useEffect(() => {
@@ -496,7 +510,7 @@ function AppContent({ onLogout, userEmail }) {
 
   const saveNow = async () => {
     setIsSavingNow(true);
-    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
+    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
     setIsSavingNow(false);
     if (ok) {
       setSavedIndicator(true);
@@ -508,13 +522,13 @@ function AppContent({ onLogout, userEmail }) {
     if (!loaded) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
+      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
       if (ok) {
         setSavedIndicator(true);
         setTimeout(() => setSavedIndicator(false), 2000);
       }
     }, 1200);
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
 
   // Force an immediate save if the person closes the tab, refreshes, or switches
   // away before the debounce timer above has fired — prevents losing the last
@@ -523,7 +537,7 @@ function AppContent({ onLogout, userEmail }) {
     if (!loaded) return;
     const flush = () => {
       clearTimeout(saveTimer.current);
-      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
+      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
     };
     const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
     window.addEventListener("beforeunload", flush);
@@ -532,7 +546,7 @@ function AppContent({ onLogout, userEmail }) {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
 
   const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",dateWork:today(),datePay:"",status:"a pagar"};
   const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true};
@@ -542,8 +556,7 @@ function AppContent({ onLogout, userEmail }) {
   const emptyReim = {pessoa:"",desc:"",value:"",tipo:"Adiantamento profissional",devolvidoPara:"Frames",datePay:"",status:"pendente"};
   const emptyFL = {name:"",apelido:"",role:ROLES[0],phone:"",email:"",cpf:"",rg:"",nasc:""};
   const emptyCache = {freelancerId:"",role:ROLES[0],desc:"",value:"",alimentacao:"",logistica:"",dateWork:today(),workDates:[],dateDue:"",datePaid:"",paymentMethod:"Pix/Transferência",status:"a pagar"};
-  const emptyProjExp = {type:EXPENSE_TYPES[0],desc:"",value:"",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"2",dateWork:today(),dateFim:"",datePay:"",status:"a pagar"};
-  const emptyAccommodation = {tipo:"Hotel",nome:"",link:"",checkIn:today(),checkOut:today(),hospedes:"1",value:"",source:PAYMENT_SOURCES[0],status:"a pagar"};
+  const emptyProjExp = {type:EXPENSE_TYPES[0],desc:"",value:"",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"2",dateWork:today(),dateFim:"",datePay:"",link:"",hospedes:"",status:"a pagar"};
 
   const [formE, setFormE] = useState(emptyE);
   const [formClient, setFormClient] = useState(emptyClient);
@@ -556,8 +569,6 @@ function AppContent({ onLogout, userEmail }) {
   const [formSub, setFormSub] = useState(emptySub);
   const [showAddStudio, setShowAddStudio] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
-  const [formAccommodation, setFormAccommodation] = useState(emptyAccommodation);
-  const [showAddAccommodation, setShowAddAccommodation] = useState(false);
 
   const cacheTotal = (c) => Number(c.value)+Number(c.alimentacao||0)+Number(c.logistica||0);
 
@@ -720,8 +731,6 @@ function AppContent({ onLogout, userEmail }) {
   const removeStudioExpense=(id)=>{const e=studioExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover "${e?.desc}"?`))return;setStudioExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa do estúdio removida: ${e?.desc}`);};
   const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:Date.now(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
   const removeSubscription=(id)=>{const e=subscriptions.find(x=>x.id===id);if(!confirmDelete(`Remover assinatura "${e?.desc}"?`))return;setSubscriptions(p=>p.filter(e=>e.id!==id));logChange(`Assinatura removida: ${e?.desc}`);};
-  const addAccommodation=()=>{if(!formAccommodation.nome||!formAccommodation.value)return;setAccommodations(p=>[...p,{...formAccommodation,id:Date.now(),jobId:selectedJob,value:Number(formAccommodation.value)}]);logChange(`Hospedagem: ${formAccommodation.nome}`);setFormAccommodation(emptyAccommodation);setShowAddAccommodation(false);};
-  const removeAccommodation=(id)=>{const a=accommodations.find(x=>x.id===id);if(!confirmDelete(`Remover hospedagem "${a?.nome}"?`))return;setAccommodations(p=>p.filter(a=>a.id!==id));logChange(`Hospedagem removida: ${a?.nome}`);};
 
   const tabs=[{key:"profissionais",label:"👥 Profissionais"},{key:"dashboard",label:"📊 Balanço"},{key:"clients",label:"📥 Clientes"},{key:"expenses",label:"💸 Gastos"},{key:"studio",label:"🏢 Estúdio"},{key:"subscriptions",label:"🔁 Assinaturas"},{key:"reimbursements",label:"🔄 Reembolsos"}];
 
@@ -729,8 +738,7 @@ function AppContent({ onLogout, userEmail }) {
   const clientJobs = (clientId) => jobs.filter(j=>j.clientId===clientId);
   const jobCaches = (jobId) => caches.filter(c=>c.jobId===jobId);
   const jobExpenses = (jobId) => projectExpenses.filter(e=>e.jobId===jobId);
-  const jobAccommodations = (jobId) => accommodations.filter(a=>a.jobId===jobId);
-  const jobCostTotal = (jobId) => jobCaches(jobId).reduce((s,c)=>s+cacheTotal(c),0) + jobExpenses(jobId).reduce((s,e)=>s+Number(e.value),0) + jobAccommodations(jobId).reduce((s,a)=>s+Number(a.value),0);
+  const jobCostTotal = (jobId) => jobCaches(jobId).reduce((s,c)=>s+cacheTotal(c),0) + jobExpenses(jobId).reduce((s,e)=>s+Number(e.value),0);
   const clientTotals = (clientId) => {
     const cjobs = clientJobs(clientId);
     const totalValue = cjobs.reduce((s,j)=>s+Number(j.value),0);
@@ -746,7 +754,6 @@ function AppContent({ onLogout, userEmail }) {
   const currentJobColor = currentJob ? getColor(currentJob.id) : "#a78bfa";
   const currentJobCaches = selectedJob ? jobCaches(selectedJob) : [];
   const currentJobExpList = selectedJob ? jobExpenses(selectedJob) : [];
-  const currentJobAccommodations = selectedJob ? jobAccommodations(selectedJob) : [];
   const currentJobTotal = selectedJob ? jobCostTotal(selectedJob) : 0;
   const expBySource = useMemo(()=>{const g={};currentJobExpList.forEach(e=>{if(!g[e.source])g[e.source]=[];g[e.source].push(e);});return g;},[currentJobExpList]);
 
@@ -780,7 +787,6 @@ function AppContent({ onLogout, userEmail }) {
         cancelEdit();
       }} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula)"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"📅 De",type:"date"},{key:"dateFim",label:"📅 Até (opcional)",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
-      {editingId&&editingId.startsWith("accommodation:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("accommodation",setAccommodations)} onCancel={cancelEdit} fields={[{key:"tipo",label:"Tipo",type:"select",options:["Hotel","Airbnb","Pousada","Outro"]},{key:"nome",label:"Nome do local"},{key:"link",label:"Link da reserva"},{key:"checkIn",label:"Check-in",type:"date"},{key:"checkOut",label:"Check-out",type:"date"},{key:"hospedes",label:"Nº de hóspedes",type:"number"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
@@ -1283,7 +1289,7 @@ function AppContent({ onLogout, userEmail }) {
             </div>
 
             <div style={{display:"flex",gap:8,marginBottom:16}}>
-              {[{key:"equipe",label:"👥 Equipe & Cachês"},{key:"gastos",label:"💸 Despesas do Job"},{key:"hotel",label:"🏨 Hotel/Airbnb"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);setShowAddAccommodation(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#1e1e2e",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
+              {[{key:"equipe",label:"👥 Equipe & Cachês"},{key:"gastos",label:"💸 Despesas do Job"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#1e1e2e",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
             </div>
 
             {jobSubTab==="equipe"&&(
@@ -1392,8 +1398,10 @@ function AppContent({ onLogout, userEmail }) {
                         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{EXPENSE_TYPES.map(t=>(<button key={t} onClick={()=>setFormProjExp(p=>({...p,type:t}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formProjExp.type===t?"#f87171":"#f8717120",color:formProjExp.type===t?"#fff":"#f87171"}}>{TYPE_ICON[t]} {t}</button>))}</div>
                       </div>
                       <Input label="Descrição (opcional)" value={formProjExp.desc} onChange={v=>setFormProjExp(p=>({...p,desc:v}))}/>
+                      {formProjExp.type==="Hotel/Airbnb"&&<Input label="🔗 Link da reserva (opcional)" value={formProjExp.link} onChange={v=>setFormProjExp(p=>({...p,link:v}))}/>}
                       <Input label="Valor (R$)" type="number" value={formProjExp.value} onChange={v=>setFormProjExp(p=>({...p,value:v}))}/>
-                      <Row><Input label="📅 De (já vem da realização do job)" type="date" value={formProjExp.dateWork} onChange={v=>setFormProjExp(p=>({...p,dateWork:v}))}/><Input label="📅 Até (opcional)" type="date" value={formProjExp.dateFim} onChange={v=>setFormProjExp(p=>({...p,dateFim:v}))}/></Row>
+                      <Row><Input label={formProjExp.type==="Hotel/Airbnb"?"📅 Check-in":"📅 De (já vem da realização do job)"} type="date" value={formProjExp.dateWork} onChange={v=>setFormProjExp(p=>({...p,dateWork:v}))}/><Input label={formProjExp.type==="Hotel/Airbnb"?"📅 Check-out":"📅 Até (opcional)"} type="date" value={formProjExp.dateFim} onChange={v=>setFormProjExp(p=>({...p,dateFim:v}))}/></Row>
+                      {formProjExp.type==="Hotel/Airbnb"&&<Input label="👥 Nº de hóspedes (opcional)" type="number" value={formProjExp.hospedes} onChange={v=>setFormProjExp(p=>({...p,hospedes:v}))}/>}
                       <Input label="💰 Data de pagamento" type="date" value={formProjExp.datePay} onChange={v=>setFormProjExp(p=>({...p,datePay:v}))}/>
                       <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>De onde saiu o dinheiro</div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{PAYMENT_SOURCES.map(s=>{const cor=SOURCE_COLOR[s]||"#94a3b8";const sel=formProjExp.source===s;return(<button key={s} onClick={()=>setFormProjExp(p=>({...p,source:s}))} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#000":cor,border:`1px solid ${cor}66`}}>{s}</button>);})}</div>
@@ -1417,7 +1425,7 @@ function AppContent({ onLogout, userEmail }) {
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {items.map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
                         <span style={{fontSize:18}}>{TYPE_ICON[item.type]||"📦"}</span>
-                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#a78bfa",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
+                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#a78bfa",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
                         <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
                         <button onClick={()=>toggleStatus(projectExpenses,setProjectExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
                         <button onClick={()=>startEdit("projexp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
@@ -1427,52 +1435,6 @@ function AppContent({ onLogout, userEmail }) {
                   </div>);
                 })}
                 {currentJobExpList.length>0&&<SummaryPill label="Total despesas do job" value={currentJobExpList.reduce((s,e)=>s+Number(e.value),0)} color="#f87171"/>}
-              </div>
-            )}
-
-            {jobSubTab==="hotel"&&(
-              <div>
-                <button onClick={()=>setShowAddAccommodation(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddAccommodation?"#1e1e2e":"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:12,color:"#22d3ee",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddAccommodation?"▲ Fechar":"＋ Adicionar hospedagem"}</button>
-                {showAddAccommodation&&(
-                  <div style={{background:"#1e1e2e",border:"1px solid #22d3ee33",borderRadius:14,padding:20,marginBottom:16}}>
-                    <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#22d3ee"}}>Nova Hospedagem</h3>
-                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Tipo</div>
-                        <div style={{display:"flex",gap:6}}>{["Hotel","Airbnb","Pousada","Outro"].map(t=>(<button key={t} onClick={()=>setFormAccommodation(p=>({...p,tipo:t}))} style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formAccommodation.tipo===t?"#22d3ee":"#22d3ee20",color:formAccommodation.tipo===t?"#fff":"#22d3ee"}}>{t==="Hotel"?"🏨":t==="Airbnb"?"🏠":t==="Pousada"?"🏡":"📍"} {t}</button>))}</div>
-                      </div>
-                      <Input label="Nome do local (ex: Hotel Ibis Centro)" value={formAccommodation.nome} onChange={v=>setFormAccommodation(p=>({...p,nome:v}))}/>
-                      <Input label="Link da reserva (opcional)" value={formAccommodation.link} onChange={v=>setFormAccommodation(p=>({...p,link:v}))}/>
-                      <Row><Input label="📅 Check-in" type="date" value={formAccommodation.checkIn} onChange={v=>setFormAccommodation(p=>({...p,checkIn:v}))}/><Input label="📅 Check-out" type="date" value={formAccommodation.checkOut} onChange={v=>setFormAccommodation(p=>({...p,checkOut:v}))}/></Row>
-                      <Row><Input label="👥 Nº de hóspedes" type="number" value={formAccommodation.hospedes} onChange={v=>setFormAccommodation(p=>({...p,hospedes:v}))}/><Input label="💰 Valor total (R$)" type="number" value={formAccommodation.value} onChange={v=>setFormAccommodation(p=>({...p,value:v}))}/></Row>
-                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>De onde saiu o dinheiro</div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{PAYMENT_SOURCES.map(s=>{const cor=SOURCE_COLOR[s]||"#94a3b8";const sel=formAccommodation.source===s;return(<button key={s} onClick={()=>setFormAccommodation(p=>({...p,source:s}))} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#000":cor,border:`1px solid ${cor}66`}}>{s}</button>);})}</div>
-                      </div>
-                      <Select label="Status" value={formAccommodation.status} onChange={v=>setFormAccommodation(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
-                      <AddBtn onClick={addAccommodation} color="#22d3ee">+ Adicionar hospedagem</AddBtn>
-                    </div>
-                  </div>
-                )}
-                {currentJobAccommodations.length===0&&!showAddAccommodation&&<div style={{textAlign:"center",color:"#475569",padding:40,fontSize:13}}>Nenhuma hospedagem lançada. <span style={{color:"#22d3ee",cursor:"pointer"}} onClick={()=>setShowAddAccommodation(true)}>+ Adicionar</span></div>}
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {currentJobAccommodations.map(item=>{
-                    const nights = item.checkIn && item.checkOut ? Math.max(1, Math.round((new Date(item.checkOut)-new Date(item.checkIn))/(1000*60*60*24))) : null;
-                    return(<div key={item.id} style={{background:"#1e1e2e",border:"1px solid #22d3ee22",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:20}}>{item.tipo==="Hotel"?"🏨":item.tipo==="Airbnb"?"🏠":item.tipo==="Pousada"?"🏡":"📍"}</span>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{item.nome}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div>
-                        <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                          {item.checkIn&&<span>📅 {item.checkIn}</span>}{item.checkOut&&<span> → {item.checkOut}</span>}{nights&&<span> · {nights} noite{nights>1?"s":""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}
-                        </div>
-                        <div style={{fontSize:10,color:"#475569",marginTop:1}}>💳 {item.source}</div>
-                      </div>
-                      <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
-                      <button onClick={()=>toggleStatus(accommodations,setAccommodations,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
-                      <button onClick={()=>startEdit("accommodation",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
-                      <button onClick={()=>removeAccommodation(item.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
-                    </div>);
-                  })}
-                </div>
-                {currentJobAccommodations.length>0&&<SummaryPill label="Total hospedagem do job" value={currentJobAccommodations.reduce((s,a)=>s+Number(a.value),0)} color="#22d3ee"/>}
               </div>
             )}
           </div>
