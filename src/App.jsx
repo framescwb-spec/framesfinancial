@@ -5,7 +5,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 
 // ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
 const firebaseConfig = {
-  apiKey: "AIzaSyClpflkp4vwKG4TUwgnaCAF-z3YqXa-4s8",
+  apiKey: "AIzaSyCLpFlkp4vwKG4TUwqnaCAF-z3YqXa-4s8",
   authDomain: "frames-system.firebaseapp.com",
   projectId: "frames-system",
   storageBucket: "frames-system.firebasestorage.app",
