@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 // ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
 const firebaseConfig = {
@@ -17,6 +18,7 @@ const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConf
 // senão o SDK tenta conectar num banco que não existe e as escritas ficam
 // travadas para sempre sem nunca dar erro nem sucesso.
 const db = getFirestore(firebaseApp, "financial");
+const auth = getAuth(firebaseApp);
 const DOC_REF = doc(db, "produtora", "framesbr");
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
@@ -263,7 +265,7 @@ async function saveToStorage(data) {
   }
 }
 
-export default function App() {
+function AppContent({ onLogout, userEmail }) {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -711,6 +713,11 @@ export default function App() {
               </button>
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
                 {isSavingNow?"Salvando...":"💾 Salvar agora"}
+              </button>
+              <div style={{width:1,height:16,background:"#ffffff20"}}/>
+              <span style={{fontSize:11,color:"#64748b"}}>{userEmail}</span>
+              <button onClick={onLogout} style={{background:"#ef444422",border:"1px solid #ef444444",color:"#f87171",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                🚪 Sair
               </button>
             </div>
           </div>
@@ -1477,6 +1484,86 @@ export default function App() {
     </div>
   );
 }
+
+// ── Tela de login ──
+function LoginScreen({ onLoginSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      onLoginSuccess();
+    } catch (err) {
+      const messages = {
+        "auth/invalid-email": "E-mail inválido.",
+        "auth/user-not-found": "Usuário não encontrado.",
+        "auth/wrong-password": "Senha incorreta.",
+        "auth/invalid-credential": "E-mail ou senha incorretos.",
+        "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente de novo.",
+      };
+      setError(messages[err.code] || `Erro ao entrar: ${err.code || err.message}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <form onSubmit={handleLogin} style={{background:"#1e1e2e",border:"1px solid #ffffff12",borderRadius:16,padding:32,width:"100%",maxWidth:360}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:36,marginBottom:8}}>🎥</div>
+          <h1 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>FramesBR <span style={{color:"#a78bfa"}}>Financial System</span></h1>
+          <p style={{margin:"6px 0 0",fontSize:12,color:"#64748b"}}>Faça login para continuar</p>
+        </div>
+        {error && <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#fca5a5"}}>{error}</div>}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>E-mail</div>
+          <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"
+            style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Senha</div>
+          <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••"
+            style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        <button type="submit" disabled={loading} style={{width:"100%",background:"#a78bfa",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
+          {loading?"Entrando...":"Entrar"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ── Wrapper que controla se mostra login ou o sistema ──
+export default function App() {
+  const [user, setUser] = useState(undefined); // undefined = checking, null = logged out, object = logged in
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
+    return () => unsub();
+  }, []);
+
+  if (user === undefined) {
+    return (
+      <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b"}}>
+        <div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🎥</div><div>Verificando login...</div></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen onLoginSuccess={() => {}} />;
+  }
+
+  return <AppContent onLogout={() => signOut(auth)} userEmail={user.email} />;
+}
+
+
 
 function EditModal({fields,editData,setEditData,onSave,onCancel,color="#a78bfa"}){
   return(
