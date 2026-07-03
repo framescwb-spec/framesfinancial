@@ -1,4 +1,19 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+
+// ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
+const firebaseConfig = {
+  apiKey: "AIzaSyClpflkp4vwKG4TUwgnaCAF-z3YqXa-4s8",
+  authDomain: "frames-system.firebaseapp.com",
+  projectId: "frames-system",
+  storageBucket: "frames-system.firebasestorage.app",
+  messagingSenderId: "488046203697",
+  appId: "1:488046203697:web:2f3ddda7b333d96c6c5610",
+};
+const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const DOC_REF = doc(db, "produtora", "framesbr");
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
 const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Gasolina","Gastos extras","Outro"];
@@ -173,11 +188,32 @@ function migrateOldData(old, defaults) {
   };
 }
 
+let lastSavedHash = null;
+let onStorageError = null; // set by the App component so errors can be shown on screen
+
+// Wraps a promise so it never hangs forever — rejects after `ms` if it hasn't
+// settled yet. This protects against silent network blocks (ad blockers,
+// privacy extensions, firewalls) that can leave a Firestore call pending
+// indefinitely without ever resolving or throwing.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Tempo esgotado (${label}). Verifique sua conexão ou bloqueadores de anúncio/rastreamento que podem estar bloqueando o Firebase.`)), ms)),
+  ]);
+}
+function hashData(data) {
+  const str = JSON.stringify(data);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; }
+  return hash;
+}
+
 async function loadFromStorage(defaults) {
   try {
-    const result = await window.storage.get(STORAGE_KEY);
-    if (result && result.value) {
-      const saved = JSON.parse(result.value);
+    const snap = await withTimeout(getDoc(DOC_REF), 10000, "carregar dados");
+    if (snap.exists()) {
+      const saved = snap.data();
+      lastSavedHash = hashData(saved);
       return {
         expenses: saved.expenses ?? [],
         clients: saved.clients ?? defaults.clients,
@@ -186,31 +222,50 @@ async function loadFromStorage(defaults) {
         freelancers: saved.freelancers ?? defaults.freelancers,
         caches: saved.caches ?? defaults.caches,
         projectExpenses: saved.projectExpenses ?? defaults.projectExpenses,
+        studioExpenses: saved.studioExpenses ?? [],
+        subscriptions: saved.subscriptions ?? [],
       };
     }
-  } catch(e) {}
+  } catch(e) { console.error("Erro ao carregar do Firebase:", e); if(onStorageError) onStorageError(`Erro ao CARREGAR: ${e.code||e.message||e}`); }
 
-  // No v2 data found — try migrating from the old v1 structure so nothing the user already edited is lost.
+  // No cloud data found — try migrating from the legacy artifact export (window.storage),
+  // if the person imported it via localStorage, so nothing already edited is lost.
   try {
-    const oldResult = await window.storage.get(OLD_STORAGE_KEY);
-    if (oldResult && oldResult.value) {
-      const old = JSON.parse(oldResult.value);
+    const legacyRaw = window.localStorage.getItem("framesbr-legacy-import");
+    if (legacyRaw) {
+      const old = JSON.parse(legacyRaw);
       const migrated = migrateOldData(old, defaults);
       await saveToStorage(migrated);
+      window.localStorage.removeItem("framesbr-legacy-import");
       return migrated;
     }
-  } catch(e) {}
+  } catch(e) { console.error("Erro na migração de dados antigos:", e); }
 
-  return defaults;
+  return { ...defaults, studioExpenses: [], subscriptions: [] };
 }
 
 async function saveToStorage(data) {
-  try { await window.storage.set(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  try {
+    const newHash = hashData(data);
+    if (newHash === lastSavedHash) return true; // nothing changed, already saved
+    await withTimeout(setDoc(DOC_REF, data, { merge: false }), 10000, "salvar dados");
+    lastSavedHash = newHash;
+    if(onStorageError) onStorageError(null);
+    return true;
+  } catch(e) {
+    console.error("Erro ao salvar no Firebase:", e);
+    if(onStorageError) onStorageError(`Erro ao SALVAR: ${e.code||e.message||e}`);
+    return false;
+  }
 }
 
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [diagResult, setDiagResult] = useState(null); // {ok, msg}
+  const [diagRunning, setDiagRunning] = useState(false);
+  useEffect(() => { onStorageError = (msg) => setSaveError(msg); return () => { onStorageError = null; }; }, []);
 
   const [tab, setTab] = useState("dashboard");
   const [dashSubTab, setDashSubTab] = useState("geral");
@@ -333,22 +388,63 @@ export default function App() {
   const saveTimer = useRef(null);
   const [isSavingNow, setIsSavingNow] = useState(false);
 
+  const runDiagnostic = async () => {
+    setDiagRunning(true);
+    setDiagResult(null);
+    const testValue = `teste-${Date.now()}`;
+    try {
+      const testRef = doc(db, "produtora", "_diagnostico");
+      await withTimeout(setDoc(testRef, { marker: testValue, ts: new Date().toISOString() }), 8000, "escrever teste");
+      const snap = await withTimeout(getDoc(testRef), 8000, "ler teste");
+      if (snap.exists() && snap.data().marker === testValue) {
+        setDiagResult({ ok: true, msg: `Escrita e leitura confirmadas às ${new Date().toLocaleTimeString("pt-BR")}. O Firebase está funcionando normalmente — se seus dados ainda não aparecem, o problema é o navegador estar com uma versão antiga do site em cache (tente aba anônima).` });
+      } else {
+        setDiagResult({ ok: false, msg: "Escreveu mas não conseguiu ler de volta o valor esperado. Pode ser regra de segurança do Firestore bloqueando leitura." });
+      }
+    } catch (e) {
+      setDiagResult({ ok: false, msg: `Falhou: ${e.code || e.message || e}. Provavelmente é bloqueio de rede/extensão, ou as credenciais/projeto do Firebase estão incorretos.` });
+    }
+    setDiagRunning(false);
+  };
+
   const saveNow = async () => {
     setIsSavingNow(true);
-    await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
-    setSavedIndicator(true);
+    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
     setIsSavingNow(false);
-    setTimeout(() => setSavedIndicator(false), 2000);
+    if (ok) {
+      setSavedIndicator(true);
+      setTimeout(() => setSavedIndicator(false), 2000);
+    }
   };
 
   useEffect(() => {
     if (!loaded) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
-      setSavedIndicator(true);
-      setTimeout(() => setSavedIndicator(false), 2000);
-    }, 4000);
+      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      if (ok) {
+        setSavedIndicator(true);
+        setTimeout(() => setSavedIndicator(false), 2000);
+      }
+    }, 1200);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
+
+  // Force an immediate save if the person closes the tab, refreshes, or switches
+  // away before the debounce timer above has fired — prevents losing the last
+  // edit made right before navigating away.
+  useEffect(() => {
+    if (!loaded) return;
+    const flush = () => {
+      clearTimeout(saveTimer.current);
+      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
 
   const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",dateWork:today(),datePay:"",status:"a pagar"};
@@ -588,6 +684,14 @@ export default function App() {
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
 
+      {/* Error banner — shows real Firebase errors directly on screen, no devtools needed */}
+      {saveError && (
+        <div style={{background:"#7f1d1d",borderBottom:"2px solid #ef4444",padding:"10px 20px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:200}}>
+          <span style={{fontSize:16}}>🔴</span>
+          <div style={{flex:1,fontSize:12,color:"#fecaca"}}><strong>Problema ao salvar/carregar:</strong> {saveError}</div>
+          <button onClick={()=>setSaveError(null)} style={{background:"transparent",border:"1px solid #fecaca66",color:"#fecaca",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>Fechar</button>
+        </div>
+      )}
       {/* Header */}
       <div style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",borderBottom:"1px solid #ffffff12",padding:"24px 24px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto"}}>
@@ -598,11 +702,21 @@ export default function App() {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:11,color:savedIndicator?"#22c55e":"#334155",transition:"color .3s"}}>{savedIndicator?"✅ Salvo":"💾 Auto-save ativo"}</span>
+              <button onClick={runDiagnostic} disabled={diagRunning} style={{background:"#a78bfa22",border:"1px solid #a78bfa44",color:"#a78bfa",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:diagRunning?"default":"pointer",opacity:diagRunning?0.6:1}}>
+                {diagRunning?"Testando...":"🔍 Testar Firebase"}
+              </button>
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
                 {isSavingNow?"Salvando...":"💾 Salvar agora"}
               </button>
             </div>
           </div>
+          {diagResult && (
+            <div style={{background:diagResult.ok?"#22c55e15":"#ef444415",border:`1px solid ${diagResult.ok?"#22c55e":"#ef4444"}44`,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>{diagResult.ok?"✅":"❌"}</span>
+              <span style={{fontSize:12,color:diagResult.ok?"#86efac":"#fecaca",flex:1}}>{diagResult.msg}</span>
+              <button onClick={()=>setDiagResult(null)} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13}}>✕</button>
+            </div>
+          )}
           {/* Search bar */}
           <div style={{position:"relative",marginBottom:12}}>
             <input
