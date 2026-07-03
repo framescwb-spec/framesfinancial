@@ -277,8 +277,6 @@ function AppContent({ onLogout, userEmail }) {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  const [diagResult, setDiagResult] = useState(null); // {ok, msg}
-  const [diagRunning, setDiagRunning] = useState(false);
   useEffect(() => { onStorageError = (msg) => setSaveError(msg); return () => { onStorageError = null; }; }, []);
 
   const [tab, setTab] = useState("dashboard");
@@ -386,6 +384,7 @@ function AppContent({ onLogout, userEmail }) {
           delete m.datePay;
         }
         if (m.datePaid === undefined) m.datePaid = "";
+        if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
         return m;
       });
       setCaches(mergedCaches);
@@ -453,25 +452,6 @@ function AppContent({ onLogout, userEmail }) {
     logChange("Resumo PDF exportado");
   };
 
-  const runDiagnostic = async () => {
-    setDiagRunning(true);
-    setDiagResult(null);
-    const testValue = `teste-${Date.now()}`;
-    try {
-      const testRef = doc(db, "produtora", currentUid, "_meta", "diagnostico");
-      await withTimeout(setDoc(testRef, { marker: testValue, ts: new Date().toISOString() }), 8000, "escrever teste");
-      const snap = await withTimeout(getDoc(testRef), 8000, "ler teste");
-      if (snap.exists() && snap.data().marker === testValue) {
-        setDiagResult({ ok: true, msg: `Escrita e leitura confirmadas às ${new Date().toLocaleTimeString("pt-BR")}. O Firebase está funcionando normalmente — se seus dados ainda não aparecem, o problema é o navegador estar com uma versão antiga do site em cache (tente aba anônima).` });
-      } else {
-        setDiagResult({ ok: false, msg: "Escreveu mas não conseguiu ler de volta o valor esperado. Pode ser regra de segurança do Firestore bloqueando leitura." });
-      }
-    } catch (e) {
-      setDiagResult({ ok: false, msg: `Falhou: ${e.code || e.message || e}. Provavelmente é bloqueio de rede/extensão, ou as credenciais/projeto do Firebase estão incorretos.` });
-    }
-    setDiagRunning(false);
-  };
-
   const saveNow = async () => {
     setIsSavingNow(true);
     const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
@@ -519,7 +499,7 @@ function AppContent({ onLogout, userEmail }) {
   const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,dateWork:today(),workDates:[],dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
   const emptyReim = {pessoa:"",desc:"",value:"",tipo:"Adiantamento profissional",devolvidoPara:"Frames",datePay:"",status:"pendente"};
   const emptyFL = {name:"",apelido:"",role:ROLES[0],phone:"",email:"",cpf:"",rg:"",nasc:""};
-  const emptyCache = {freelancerId:"",role:ROLES[0],desc:"",value:"",alimentacao:"",logistica:"",dateWork:today(),dateDue:"",datePaid:"",paymentMethod:"Pix/Transferência",status:"a pagar"};
+  const emptyCache = {freelancerId:"",role:ROLES[0],desc:"",value:"",alimentacao:"",logistica:"",dateWork:today(),workDates:[],dateDue:"",datePaid:"",paymentMethod:"Pix/Transferência",status:"a pagar"};
   const emptyProjExp = {type:EXPENSE_TYPES[0],desc:"",value:"",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"2",dateWork:today(),datePay:"",status:"a pagar"};
 
   const [formE, setFormE] = useState(emptyE);
@@ -645,17 +625,6 @@ function AppContent({ onLogout, userEmail }) {
     return results.slice(0,8);
   },[searchQuery,clients,jobs,freelancers]);
 
-  // Financial health indicator
-  const healthIndicator = useMemo(()=>{
-    const {projected,totalReceivables}=totals;
-    if(totalReceivables===0) return {label:"Sem dados",color:"#64748b",icon:"—"};
-    const margin=projected/totalReceivables;
-    if(margin>=0.3) return {label:"Saudável",color:"#22c55e",icon:"✅"};
-    if(margin>=0.1) return {label:"Atenção",color:"#f59e0b",icon:"⚠️"};
-    if(margin>=0) return {label:"Margem apertada",color:"#fb923c",icon:"🔶"};
-    return {label:"Prejuízo projetado",color:"#ef4444",icon:"🔴"};
-  },[totals]);
-
   const addExpense=()=>{if(!formE.desc||!formE.value)return;setExpenses(p=>[...p,{...formE,id:Date.now(),value:Number(formE.value)}]);logChange(`Gasto: ${formE.desc}`);setFormE(emptyE);};
   const addClient=()=>{if(!formClient.name)return;setClients(p=>[...p,{...formClient,id:Date.now()}]);logChange(`Cliente adicionado: ${formClient.name}`);setFormClient(emptyClient);setShowAddClient(false);};
   const removeClient=(id)=>{
@@ -688,7 +657,14 @@ function AppContent({ onLogout, userEmail }) {
   };
   const removeJob=(id)=>{const j=jobs.find(x=>x.id===id);if(!confirmDelete(`Remover job "${j?.desc}"?`))return;setJobs(p=>p.filter(j=>j.id!==id));setCaches(p=>p.filter(c=>c.jobId!==id));setProjectExpenses(p=>p.filter(e=>e.jobId!==id));logChange(`Job removido: ${j?.desc}`);};
   const addReimb=()=>{if(!formReim.pessoa||!formReim.desc||!formReim.value)return;setReimbursements(p=>[...p,{...formReim,id:Date.now(),value:Number(formReim.value)}]);logChange(`Reembolso: ${formReim.pessoa}`);setFormReim(emptyReim);};
-  const addCacheToJob=()=>{if(!formCache.freelancerId||!formCache.value)return;const fl=freelancers.find(f=>f.id===formCache.freelancerId);setCaches(p=>[...p,{...formCache,id:Date.now(),jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0)}]);logChange(`Cache: ${fl?.apelido||fl?.name}`);setFormCache(emptyCache);setShowAddFL(false);};
+  const addCacheToJob=()=>{
+    if(!formCache.freelancerId||!formCache.value)return;
+    const fl=freelancers.find(f=>f.id===formCache.freelancerId);
+    const wd=(formCache.workDates||[]).slice().sort();
+    setCaches(p=>[...p,{...formCache,id:Date.now(),jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0),workDates:wd,dateWork:wd[0]||formCache.dateWork||""}]);
+    logChange(`Cache: ${fl?.apelido||fl?.name}`);
+    setFormCache(emptyCache);setShowAddFL(false);
+  };
   const addProjectExpense=()=>{if(!formProjExp.value)return;setProjectExpenses(p=>[...p,{...formProjExp,id:Date.now(),jobId:selectedJob,value:Number(formProjExp.value)}]);logChange(`Despesa: ${formProjExp.type}`);setFormProjExp(emptyProjExp);setShowAddExpense(false);};
   const removeCache=(id)=>{const c=caches.find(x=>x.id===id);const fl=freelancers.find(f=>f.id===c?.freelancerId);if(!confirmDelete(`Remover cachê de ${fl?.apelido||fl?.name}?`))return;setCaches(p=>p.filter(c=>c.id!==id));logChange(`Cache removido: ${fl?.apelido||fl?.name}`);};
   const removeFreelancer=(id)=>{const fl=freelancers.find(f=>f.id===id);if(!confirmDelete(`Remover profissional "${fl?.name}"?`))return;setFreelancers(p=>p.filter(f=>f.id!==id));setCaches(p=>p.filter(c=>c.freelancerId!==id));logChange(`Profissional removido: ${fl?.name}`);};
@@ -745,9 +721,13 @@ function AppContent({ onLogout, userEmail }) {
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
         setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
         setEditingId(null);setEditData({});
-      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"valorRecebido",label:"Já recebido (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
+      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
       {editingId&&editingId.startsWith("reimb:")&&<EditModal editData={editData} setEditData={setEditData} color="#fb923c" onSave={()=>saveEdit("reimb",setReimbursements)} onCancel={cancelEdit} fields={[{key:"pessoa",label:"Pessoa"},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"devolvidoPara",label:"Devolvido para",type:"select",options:REIMB_SOURCES},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["pendente","recebido"]}]}/>}
-      {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{setCaches(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),alimentacao:Number(editData.alimentacao||0),logistica:Number(editData.logistica||0)}:i));cancelEdit();}} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"dateWork",label:"📅 Data do trabalho",type:"date"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
+      {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{
+        const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
+        setCaches(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),alimentacao:Number(editData.alimentacao||0),logistica:Number(editData.logistica||0),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
+        cancelEdit();
+      }} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula)"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"Data do trabalho",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
@@ -768,13 +748,9 @@ function AppContent({ onLogout, userEmail }) {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <h1 style={{margin:0,fontSize:22,fontWeight:700,color:"#fff"}}>🎥 FramesBR <span style={{color:"#a78bfa"}}>Financial System</span></h1>
-              <span style={{fontSize:11,background:healthIndicator.color+"22",color:healthIndicator.color,border:`1px solid ${healthIndicator.color}44`,borderRadius:6,padding:"2px 8px",fontWeight:600}}>{healthIndicator.icon} {healthIndicator.label}</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:11,color:savedIndicator?"#22c55e":"#334155",transition:"color .3s"}}>{savedIndicator?"✅ Salvo":"💾 Auto-save ativo"}</span>
-              <button onClick={runDiagnostic} disabled={diagRunning} style={{background:"#a78bfa22",border:"1px solid #a78bfa44",color:"#a78bfa",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:diagRunning?"default":"pointer",opacity:diagRunning?0.6:1}}>
-                {diagRunning?"Testando...":"🔍 Testar Firebase"}
-              </button>
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
                 {isSavingNow?"Salvando...":"💾 Salvar agora"}
               </button>
@@ -788,13 +764,6 @@ function AppContent({ onLogout, userEmail }) {
               </button>
             </div>
           </div>
-          {diagResult && (
-            <div style={{background:diagResult.ok?"#22c55e15":"#ef444415",border:`1px solid ${diagResult.ok?"#22c55e":"#ef4444"}44`,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:16}}>{diagResult.ok?"✅":"❌"}</span>
-              <span style={{fontSize:12,color:diagResult.ok?"#86efac":"#fecaca",flex:1}}>{diagResult.msg}</span>
-              <button onClick={()=>setDiagResult(null)} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13}}>✕</button>
-            </div>
-          )}
           {/* Search bar */}
           <div style={{position:"relative",marginBottom:12}}>
             <input
@@ -1108,7 +1077,7 @@ function AppContent({ onLogout, userEmail }) {
             {showAddJob&&(
               <FormCard title="Novo Projeto/Job" color="#a78bfa">
                 <Input label="Nome do projeto/job" value={formJob.desc} onChange={v=>setFormJob(p=>({...p,desc:v}))}/>
-                <Row><Input label="Valor total (R$)" type="number" value={formJob.value} onChange={v=>setFormJob(p=>({...p,value:v}))}/><Input label="Já recebido (R$)" type="number" value={formJob.valorRecebido} onChange={v=>setFormJob(p=>({...p,valorRecebido:v}))}/></Row>
+                <Input label="Valor total (R$)" type="number" value={formJob.value} onChange={v=>setFormJob(p=>({...p,value:v}))}/>
                 <div>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>📅 Diárias de gravação (pode adicionar mais de uma)</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
@@ -1256,7 +1225,13 @@ function AppContent({ onLogout, userEmail }) {
 
             {jobSubTab==="equipe"&&(
               <div>
-                <button onClick={()=>setShowAddFL(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddFL?"#1e1e2e":currentJobColor+"22",border:`1px solid ${currentJobColor}44`,borderRadius:12,color:currentJobColor,fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddFL?"▲ Fechar":"＋ Adicionar profissional"}</button>
+                <button onClick={()=>setShowAddFL(v=>{
+                  const next=!v;
+                  if(next && (!formCache.workDates||formCache.workDates.length===0) && currentJob?.workDates?.length>0){
+                    setFormCache(p=>({...p,workDates:[...currentJob.workDates],dateWork:currentJob.workDates[0]}));
+                  }
+                  return next;
+                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddFL?"#1e1e2e":currentJobColor+"22",border:`1px solid ${currentJobColor}44`,borderRadius:12,color:currentJobColor,fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddFL?"▲ Fechar":"＋ Adicionar profissional"}</button>
                 {showAddFL&&(
                   <div style={{background:"#1e1e2e",border:`1px solid ${currentJobColor}33`,borderRadius:14,padding:20,marginBottom:16}}>
                     {freelancers.length>0?(<>
@@ -1268,8 +1243,32 @@ function AppContent({ onLogout, userEmail }) {
                         <Row><Select label="Função" value={formCache.role} onChange={v=>setFormCache(p=>({...p,role:v}))} options={ROLES}/><Input label="💰 Cachê (R$)" type="number" value={formCache.value} onChange={v=>setFormCache(p=>({...p,value:v}))}/></Row>
                         <Input label="Descrição (opcional)" value={formCache.desc} onChange={v=>setFormCache(p=>({...p,desc:v}))}/>
                         <Row><Input label="🍽️ Alimentação (R$)" type="number" value={formCache.alimentacao} onChange={v=>setFormCache(p=>({...p,alimentacao:v}))}/><Input label="🚗 Logística (R$)" type="number" value={formCache.logistica} onChange={v=>setFormCache(p=>({...p,logistica:v}))}/></Row>
-                        <Row><Input label="📅 Data do trabalho" type="date" value={formCache.dateWork} onChange={v=>setFormCache(p=>({...p,dateWork:v}))}/><Input label="⏰ Combinado pagar em" type="date" value={formCache.dateDue} onChange={v=>setFormCache(p=>({...p,dateDue:v}))}/></Row>
-                        <Input label="✅ Pago em (data real)" type="date" value={formCache.datePaid} onChange={v=>setFormCache(p=>({...p,datePaid:v}))}/>
+                        <div>
+                          <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>📅 Diárias trabalhadas (herdadas do job, pode ajustar)</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+                            {(formCache.workDates||[]).map((d,i)=>(
+                              <span key={i} style={{background:currentJobColor+"22",border:`1px solid ${currentJobColor}44`,borderRadius:6,padding:"4px 8px",fontSize:11,color:currentJobColor,display:"flex",alignItems:"center",gap:6}}>
+                                {d}
+                                <button onClick={()=>setFormCache(p=>({...p,workDates:p.workDates.filter((_,x)=>x!==i)}))} style={{background:"transparent",border:"none",color:currentJobColor,cursor:"pointer",fontSize:12,padding:0}}>✕</button>
+                              </span>
+                            ))}
+                            {(!formCache.workDates||formCache.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária ainda.</span>}
+                          </div>
+                          <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>De</div><input type="date" id="cacheRangeStart" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Até</div><input type="date" id="cacheRangeEnd" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <button onClick={()=>{
+                              const start=document.getElementById("cacheRangeStart").value;
+                              const end=document.getElementById("cacheRangeEnd").value;
+                              if(!start||!end)return;
+                              const dates=[];
+                              let cur=new Date(start);const last=new Date(end);
+                              while(cur<=last){ dates.push(cur.toISOString().split("T")[0]); cur.setDate(cur.getDate()+1); }
+                              setFormCache(p=>({...p,workDates:Array.from(new Set([...(p.workDates||[]),...dates])).sort(),dateWork:p.dateWork||dates[0]}));
+                            }} style={{background:currentJobColor,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Gerar diárias do período</button>
+                          </div>
+                        </div>
+                        <Row><Input label="⏰ Combinado pagar em" type="date" value={formCache.dateDue} onChange={v=>setFormCache(p=>({...p,dateDue:v}))}/><Input label="✅ Pago em (data real)" type="date" value={formCache.datePaid} onChange={v=>setFormCache(p=>({...p,datePaid:v}))}/></Row>
                         <Row><Select label="Status" value={formCache.status} onChange={v=>setFormCache(p=>({...p,status:v}))} options={["a pagar","pago"]}/><Select label="Forma de pagamento" value={formCache.paymentMethod||"Pix/Transferência"} onChange={v=>setFormCache(p=>({...p,paymentMethod:v}))} options={PAYMENT_METHODS}/></Row>
                         <AddBtn onClick={addCacheToJob} color={currentJobColor}>+ Adicionar</AddBtn>
                       </div>
@@ -1295,10 +1294,10 @@ function AppContent({ onLogout, userEmail }) {
                     return(<div key={c.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:14,padding:"14px 16px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
                         <div style={{width:38,height:38,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:cor,flexShrink:0}}>{fl?(fl.apelido?fl.apelido.slice(0,3):fl.name[0]):"?"}</div>
-                        <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{fl?.name||"\u2014"}{c.desc&&<span style={{color:"#64748b",fontWeight:400}}> \u2014 {c.desc}</span>}{(()=>{if(c.status==="pago")return null;const ref=c.dateDue||c.dateWork;if(!ref)return null;const age=Math.ceil((new Date(today())-new Date(ref))/(1000*60*60*24));if(age>30)return <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",borderRadius:5,padding:"2px 6px",marginLeft:6,fontWeight:700}}>h\u00e1 {age}d sem pagar</span>;return null;})()}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{c.role}{c.dateWork&&` \u00b7 \ud83d\udcc5 ${c.dateWork}`}{c.dateDue&&` \u00b7 \u23f0 ${c.dateDue}`}{c.datePaid&&<span style={{color:"#22c55e"}}> \u00b7 \u2705 {c.datePaid}</span>}{c.paymentMethod&&c.status==="pago"&&<span style={{color:"#22c55e"}}> \u00b7 {c.paymentMethod}</span>}</div></div>
+                        <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{fl?.name||"\u2014"}{c.desc&&<span style={{color:"#64748b",fontWeight:400}}> \u2014 {c.desc}</span>}{(()=>{if(c.status==="pago")return null;const ref=c.dateDue||c.dateWork;if(!ref)return null;const age=Math.ceil((new Date(today())-new Date(ref))/(1000*60*60*24));if(age>30)return <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",borderRadius:5,padding:"2px 6px",marginLeft:6,fontWeight:700}}>h\u00e1 {age}d sem pagar</span>;return null;})()}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{c.role}{(c.workDates&&c.workDates.length>0)?` \u00b7 \ud83d\udcc5 ${c.workDates.length>1?`${c.workDates.length} di\u00e1rias (${c.workDates[0]} a ${c.workDates[c.workDates.length-1]})`:c.workDates[0]}`:(c.dateWork&&` \u00b7 \ud83d\udcc5 ${c.dateWork}`)}{c.dateDue&&` \u00b7 \u23f0 ${c.dateDue}`}{c.datePaid&&<span style={{color:"#22c55e"}}> \u00b7 \u2705 {c.datePaid}</span>}{c.paymentMethod&&c.status==="pago"&&<span style={{color:"#22c55e"}}> \u00b7 {c.paymentMethod}</span>}</div></div>
                         <div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{formatBRL(total)}</div></div>
                         <button onClick={()=>toggleStatus(caches,setCaches,c.id,["a pagar","pago"])} style={{background:statusColor[c.status]+"22",color:statusColor[c.status],border:`1px solid ${statusColor[c.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{c.status}</button>
-                        <button onClick={()=>startEdit("cache",c)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                        <button onClick={()=>startEdit("cache",{...c,workDatesText:(c.workDates||[]).join(", ")})} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
                         <button onClick={()=>removeCache(c.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                       </div>
                       <div style={{display:"flex",gap:8,paddingLeft:50}}>
