@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { jsPDF } from "jspdf";
 
@@ -130,6 +130,7 @@ const DEFAULT_PROJ_EXPENSES = [
 ];
 
 const DEFAULT_STUDIO_EXPENSES = [];
+const DEFAULT_ACCOMMODATIONS = [];
 const DEFAULT_SUBSCRIPTIONS = [];
 const STUDIO_CATEGORIES = ["Aluguel","Internet","Energia","Água","Condomínio","Limpeza","Manutenção","Segurança","Outros"];
 const SUB_CATEGORIES = ["Design","Edição","IA","Cloud/Storage","Música","Hospedagem","Comunicação","Contabilidade","Outros"];
@@ -238,6 +239,7 @@ async function loadFromStorage(defaults) {
         projectExpenses: saved.projectExpenses ?? defaults.projectExpenses,
         studioExpenses: saved.studioExpenses ?? [],
         subscriptions: saved.subscriptions ?? [],
+        accommodations: saved.accommodations ?? [],
       };
     }
   } catch(e) { console.error("Erro ao carregar do Firebase:", e); if(onStorageError) onStorageError(`Erro ao CARREGAR: ${e.code||e.message||e}`); }
@@ -277,6 +279,7 @@ function AppContent({ onLogout, userEmail }) {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [syncNotice, setSyncNotice] = useState(false);
   useEffect(() => { onStorageError = (msg) => setSaveError(msg); return () => { onStorageError = null; }; }, []);
 
   const [tab, setTab] = useState("dashboard");
@@ -309,94 +312,133 @@ function AppContent({ onLogout, userEmail }) {
   const [projectExpenses, setProjectExpenses] = useState(DEFAULT_PROJ_EXPENSES);
   const [studioExpenses, setStudioExpenses] = useState(DEFAULT_STUDIO_EXPENSES);
   const [subscriptions, setSubscriptions] = useState(DEFAULT_SUBSCRIPTIONS);
+  const [accommodations, setAccommodations] = useState(DEFAULT_ACCOMMODATIONS);
+
+  const applyLoadedData = (data) => {
+    setExpenses(data.expenses);
+
+    const savedClientIds = new Set(data.clients.map(c => c.id));
+    let mergedClients = [...data.clients, ...DEFAULT_CLIENTS.filter(c => !savedClientIds.has(c.id))];
+    const savedJobIds = new Set(data.jobs.map(j => j.id));
+    let mergedJobs = [...data.jobs, ...DEFAULT_JOBS.filter(j => !savedJobIds.has(j.id))];
+
+    // Fix duplicate "Cruzeiro do Sul": an earlier auto-fix may have already renamed client id 7
+    // (originally "RIO2C") to "Cruzeiro do Sul", creating a duplicate alongside the user's
+    // original client. Detect ANY duplicate "Cruzeiro do Sul" entries and merge them into one,
+    // keeping the lowest id as canonical and moving jobs from the others over to it.
+    const cruzeiroDupes = mergedClients.filter(c => c.name === "Cruzeiro do Sul");
+    if (cruzeiroDupes.length > 1) {
+      const canonical = cruzeiroDupes.reduce((a,b) => a.id < b.id ? a : b);
+      const dupeIds = cruzeiroDupes.filter(c => c.id !== canonical.id).map(c => c.id);
+      mergedJobs = mergedJobs.map(j => dupeIds.includes(j.clientId) ? {...j, clientId: canonical.id} : j);
+      mergedClients = mergedClients.filter(c => !dupeIds.includes(c.id));
+    } else {
+      // No duplicate yet — fall back to the original rename-if-needed logic.
+      const rio2cClient = mergedClients.find(c => c.id === 7 && c.name === "RIO2C");
+      if (rio2cClient) {
+        mergedClients = mergedClients.map(c => c.id === 7 ? {...c, name: "Cruzeiro do Sul"} : c);
+      }
+    }
+    // Move job "GINGA" (id 106) from the old standalone "GINGA" client (id 6) into the
+    // new "CWB Brasil" client (id 9), without losing any edits already saved on the job
+    // (value, valorRecebido, status, dates, etc. are preserved — only clientId changes).
+    const cwbClient = mergedClients.find(c => c.name === "CWB Brasil");
+    if (cwbClient) {
+      mergedJobs = mergedJobs.map(j => (j.id === 106 || (j.desc === "GINGA" && j.clientId === 6)) ? {...j, clientId: cwbClient.id} : j);
+    }
+
+    setClients(mergedClients);
+
+    // ── Date model migration ──
+    // Jobs: old `datePay` becomes `dateDueExpected` (previsão de recebimento).
+    // Old binary statuses map to the new stage system.
+    mergedJobs = mergedJobs.map(j => {
+      const m = {...j};
+      if (m.datePay !== undefined && m.dateDueExpected === undefined) {
+        m.dateDueExpected = m.datePay || "";
+        delete m.datePay;
+      }
+      if (m.dateDelivery === undefined) m.dateDelivery = "";
+      if (m.dateInvoice === undefined) m.dateInvoice = "";
+      if (m.dateReceived === undefined) m.dateReceived = "";
+      if (!Array.isArray(m.payments)) m.payments = [];
+      if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
+      if (m.produtoraRate === undefined) m.produtoraRate = 0;
+      if (m.status === "pendente") m.status = "fechado";
+      return m;
+    });
+    setJobs(mergedJobs);
+
+    setReimbursements(data.reimbursements);
+
+    const savedFLIds = new Set(data.freelancers.map(f => f.id));
+    setFreelancers([...data.freelancers, ...DEFAULT_FREELANCERS.filter(f => !savedFLIds.has(f.id))]);
+
+    const savedCacheIds = new Set(data.caches.map(c => c.id));
+    let mergedCaches = [...data.caches, ...DEFAULT_CACHES.filter(c => !savedCacheIds.has(c.id))];
+    // Caches: old `datePay` becomes `dateDue` (quando combinou de pagar).
+    mergedCaches = mergedCaches.map(c => {
+      const m = {...c};
+      if (m.datePay !== undefined && m.dateDue === undefined) {
+        m.dateDue = m.datePay || "";
+        delete m.datePay;
+      }
+      if (m.datePaid === undefined) m.datePaid = "";
+      if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
+      return m;
+    });
+    setCaches(mergedCaches);
+
+    const savedProjExpIds = new Set(data.projectExpenses.map(e => e.id));
+    setProjectExpenses([...data.projectExpenses, ...DEFAULT_PROJ_EXPENSES.filter(e => !savedProjExpIds.has(e.id))].map(e => e.dateFim === undefined ? {...e, dateFim: ""} : e));
+
+    setStudioExpenses(Array.isArray(data.studioExpenses) ? data.studioExpenses : []);
+    setSubscriptions(Array.isArray(data.subscriptions) ? data.subscriptions : []);
+    setAccommodations(Array.isArray(data.accommodations) ? data.accommodations : []);
+  };
 
   useEffect(() => {
+    let unsubscribe = null;
+
     loadFromStorage({
       expenses: [], clients: DEFAULT_CLIENTS, jobs: DEFAULT_JOBS,
       reimbursements: DEFAULT_REIMBURSEMENTS, freelancers: DEFAULT_FREELANCERS,
       caches: DEFAULT_CACHES, projectExpenses: DEFAULT_PROJ_EXPENSES,
     }).then(data => {
-      setExpenses(data.expenses);
-
-      const savedClientIds = new Set(data.clients.map(c => c.id));
-      let mergedClients = [...data.clients, ...DEFAULT_CLIENTS.filter(c => !savedClientIds.has(c.id))];
-      const savedJobIds = new Set(data.jobs.map(j => j.id));
-      let mergedJobs = [...data.jobs, ...DEFAULT_JOBS.filter(j => !savedJobIds.has(j.id))];
-
-      // Fix duplicate "Cruzeiro do Sul": an earlier auto-fix may have already renamed client id 7
-      // (originally "RIO2C") to "Cruzeiro do Sul", creating a duplicate alongside the user's
-      // original client. Detect ANY duplicate "Cruzeiro do Sul" entries and merge them into one,
-      // keeping the lowest id as canonical and moving jobs from the others over to it.
-      const cruzeiroDupes = mergedClients.filter(c => c.name === "Cruzeiro do Sul");
-      if (cruzeiroDupes.length > 1) {
-        const canonical = cruzeiroDupes.reduce((a,b) => a.id < b.id ? a : b);
-        const dupeIds = cruzeiroDupes.filter(c => c.id !== canonical.id).map(c => c.id);
-        mergedJobs = mergedJobs.map(j => dupeIds.includes(j.clientId) ? {...j, clientId: canonical.id} : j);
-        mergedClients = mergedClients.filter(c => !dupeIds.includes(c.id));
-      } else {
-        // No duplicate yet — fall back to the original rename-if-needed logic.
-        const rio2cClient = mergedClients.find(c => c.id === 7 && c.name === "RIO2C");
-        if (rio2cClient) {
-          mergedClients = mergedClients.map(c => c.id === 7 ? {...c, name: "Cruzeiro do Sul"} : c);
-        }
-      }
-      // Move job "GINGA" (id 106) from the old standalone "GINGA" client (id 6) into the
-      // new "CWB Brasil" client (id 9), without losing any edits already saved on the job
-      // (value, valorRecebido, status, dates, etc. are preserved — only clientId changes).
-      const cwbClient = mergedClients.find(c => c.name === "CWB Brasil");
-      if (cwbClient) {
-        mergedJobs = mergedJobs.map(j => (j.id === 106 || (j.desc === "GINGA" && j.clientId === 6)) ? {...j, clientId: cwbClient.id} : j);
-      }
-
-      setClients(mergedClients);
-
-      // ── Date model migration ──
-      // Jobs: old `datePay` becomes `dateDueExpected` (previsão de recebimento).
-      // Old binary statuses map to the new stage system.
-      mergedJobs = mergedJobs.map(j => {
-        const m = {...j};
-        if (m.datePay !== undefined && m.dateDueExpected === undefined) {
-          m.dateDueExpected = m.datePay || "";
-          delete m.datePay;
-        }
-        if (m.dateDelivery === undefined) m.dateDelivery = "";
-        if (m.dateInvoice === undefined) m.dateInvoice = "";
-        if (m.dateReceived === undefined) m.dateReceived = "";
-        if (!Array.isArray(m.payments)) m.payments = [];
-        if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
-        if (m.status === "pendente") m.status = "fechado";
-        return m;
-      });
-      setJobs(mergedJobs);
-
-      setReimbursements(data.reimbursements);
-
-      const savedFLIds = new Set(data.freelancers.map(f => f.id));
-      setFreelancers([...data.freelancers, ...DEFAULT_FREELANCERS.filter(f => !savedFLIds.has(f.id))]);
-
-      const savedCacheIds = new Set(data.caches.map(c => c.id));
-      let mergedCaches = [...data.caches, ...DEFAULT_CACHES.filter(c => !savedCacheIds.has(c.id))];
-      // Caches: old `datePay` becomes `dateDue` (quando combinou de pagar).
-      mergedCaches = mergedCaches.map(c => {
-        const m = {...c};
-        if (m.datePay !== undefined && m.dateDue === undefined) {
-          m.dateDue = m.datePay || "";
-          delete m.datePay;
-        }
-        if (m.datePaid === undefined) m.datePaid = "";
-        if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
-        return m;
-      });
-      setCaches(mergedCaches);
-
-      const savedProjExpIds = new Set(data.projectExpenses.map(e => e.id));
-      setProjectExpenses([...data.projectExpenses, ...DEFAULT_PROJ_EXPENSES.filter(e => !savedProjExpIds.has(e.id))]);
-
-      setStudioExpenses(Array.isArray(data.studioExpenses) ? data.studioExpenses : []);
-      setSubscriptions(Array.isArray(data.subscriptions) ? data.subscriptions : []);
-
+      applyLoadedData(data);
       setLoaded(true);
+      let isFirstSnapshot = true;
+
+      // ── Sincronização em tempo real entre dispositivos ──
+      // A partir daqui, qualquer alteração salva por ESTE ou por QUALQUER OUTRO
+      // dispositivo logado na mesma conta chega automaticamente aqui e atualiza
+      // a tela. Isso evita que dois computadores abertos ao mesmo tempo apaguem
+      // as mudanças um do outro — cada um sempre trabalha em cima da versão mais
+      // recente, não de uma cópia desatualizada guardada só na memória local.
+      try {
+        unsubscribe = onSnapshot(getDocRef(), (snap) => {
+          if (!snap.exists()) return;
+          // Ignora a própria escrita otimista local ainda não confirmada pelo
+          // servidor — ela já está refletida na tela, reprocessar de novo não
+          // muda nada e só gastaria tempo.
+          if (snap.metadata.hasPendingWrites) return;
+          const saved = snap.data();
+          lastSavedHash = hashData(saved); // evita que o auto-save regrave o que acabou de chegar
+          applyLoadedData(saved);
+          if (!isFirstSnapshot) {
+            setSyncNotice(true);
+            setTimeout(() => setSyncNotice(false), 2500);
+          }
+          isFirstSnapshot = false;
+        }, (err) => {
+          console.error("Erro na sincronização em tempo real:", err);
+        });
+      } catch (e) {
+        console.error("Não foi possível iniciar sincronização em tempo real:", e);
+      }
     });
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const saveTimer = useRef(null);
@@ -454,7 +496,7 @@ function AppContent({ onLogout, userEmail }) {
 
   const saveNow = async () => {
     setIsSavingNow(true);
-    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
     setIsSavingNow(false);
     if (ok) {
       setSavedIndicator(true);
@@ -466,13 +508,13 @@ function AppContent({ onLogout, userEmail }) {
     if (!loaded) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
       if (ok) {
         setSavedIndicator(true);
         setTimeout(() => setSavedIndicator(false), 2000);
       }
     }, 1200);
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations, loaded]);
 
   // Force an immediate save if the person closes the tab, refreshes, or switches
   // away before the debounce timer above has fired — prevents losing the last
@@ -481,7 +523,7 @@ function AppContent({ onLogout, userEmail }) {
     if (!loaded) return;
     const flush = () => {
       clearTimeout(saveTimer.current);
-      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations });
     };
     const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
     window.addEventListener("beforeunload", flush);
@@ -490,17 +532,18 @@ function AppContent({ onLogout, userEmail }) {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, accommodations, loaded]);
 
   const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",dateWork:today(),datePay:"",status:"a pagar"};
   const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true};
   const emptySub = {desc:"",value:"",category:SUB_CATEGORIES[0],cycle:"mensal",dayOfMonth:"1",dateStart:today(),active:true};
   const emptyClient = {name:""};
-  const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,dateWork:today(),workDates:[],dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
+  const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,produtoraRate:"",dateWork:today(),workDates:[],dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
   const emptyReim = {pessoa:"",desc:"",value:"",tipo:"Adiantamento profissional",devolvidoPara:"Frames",datePay:"",status:"pendente"};
   const emptyFL = {name:"",apelido:"",role:ROLES[0],phone:"",email:"",cpf:"",rg:"",nasc:""};
   const emptyCache = {freelancerId:"",role:ROLES[0],desc:"",value:"",alimentacao:"",logistica:"",dateWork:today(),workDates:[],dateDue:"",datePaid:"",paymentMethod:"Pix/Transferência",status:"a pagar"};
-  const emptyProjExp = {type:EXPENSE_TYPES[0],desc:"",value:"",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"2",dateWork:today(),datePay:"",status:"a pagar"};
+  const emptyProjExp = {type:EXPENSE_TYPES[0],desc:"",value:"",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"2",dateWork:today(),dateFim:"",datePay:"",status:"a pagar"};
+  const emptyAccommodation = {tipo:"Hotel",nome:"",link:"",checkIn:today(),checkOut:today(),hospedes:"1",value:"",source:PAYMENT_SOURCES[0],status:"a pagar"};
 
   const [formE, setFormE] = useState(emptyE);
   const [formClient, setFormClient] = useState(emptyClient);
@@ -513,6 +556,8 @@ function AppContent({ onLogout, userEmail }) {
   const [formSub, setFormSub] = useState(emptySub);
   const [showAddStudio, setShowAddStudio] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
+  const [formAccommodation, setFormAccommodation] = useState(emptyAccommodation);
+  const [showAddAccommodation, setShowAddAccommodation] = useState(false);
 
   const cacheTotal = (c) => Number(c.value)+Number(c.alimentacao||0)+Number(c.logistica||0);
 
@@ -651,7 +696,7 @@ function AppContent({ onLogout, userEmail }) {
   const addJob=()=>{
     if(!formJob.desc||!formJob.value||!selectedClient)return;
     const wd=(formJob.workDates||[]).slice().sort();
-    setJobs(p=>[...p,{...formJob,id:Date.now(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate),workDates:wd,dateWork:wd[0]||""}]);
+    setJobs(p=>[...p,{...formJob,id:Date.now(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate),produtoraRate:Number(formJob.produtoraRate||0),workDates:wd,dateWork:wd[0]||""}]);
     logChange(`Job adicionado: ${formJob.desc}`);
     setFormJob(emptyJob);setShowAddJob(false);
   };
@@ -663,7 +708,9 @@ function AppContent({ onLogout, userEmail }) {
     const wd=(formCache.workDates||[]).slice().sort();
     setCaches(p=>[...p,{...formCache,id:Date.now(),jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0),workDates:wd,dateWork:wd[0]||formCache.dateWork||""}]);
     logChange(`Cache: ${fl?.apelido||fl?.name}`);
-    setFormCache(emptyCache);setShowAddFL(false);
+    // Mantém as diárias preenchidas para o próximo profissional que for adicionado
+    // neste mesmo job — só limpa quem é a pessoa, valor e outros dados pessoais.
+    setFormCache({...emptyCache, workDates: wd, dateWork: wd[0]||formCache.dateWork||"", dateDue: formCache.dateDue});
   };
   const addProjectExpense=()=>{if(!formProjExp.value)return;setProjectExpenses(p=>[...p,{...formProjExp,id:Date.now(),jobId:selectedJob,value:Number(formProjExp.value)}]);logChange(`Despesa: ${formProjExp.type}`);setFormProjExp(emptyProjExp);setShowAddExpense(false);};
   const removeCache=(id)=>{const c=caches.find(x=>x.id===id);const fl=freelancers.find(f=>f.id===c?.freelancerId);if(!confirmDelete(`Remover cachê de ${fl?.apelido||fl?.name}?`))return;setCaches(p=>p.filter(c=>c.id!==id));logChange(`Cache removido: ${fl?.apelido||fl?.name}`);};
@@ -673,6 +720,8 @@ function AppContent({ onLogout, userEmail }) {
   const removeStudioExpense=(id)=>{const e=studioExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover "${e?.desc}"?`))return;setStudioExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa do estúdio removida: ${e?.desc}`);};
   const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:Date.now(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
   const removeSubscription=(id)=>{const e=subscriptions.find(x=>x.id===id);if(!confirmDelete(`Remover assinatura "${e?.desc}"?`))return;setSubscriptions(p=>p.filter(e=>e.id!==id));logChange(`Assinatura removida: ${e?.desc}`);};
+  const addAccommodation=()=>{if(!formAccommodation.nome||!formAccommodation.value)return;setAccommodations(p=>[...p,{...formAccommodation,id:Date.now(),jobId:selectedJob,value:Number(formAccommodation.value)}]);logChange(`Hospedagem: ${formAccommodation.nome}`);setFormAccommodation(emptyAccommodation);setShowAddAccommodation(false);};
+  const removeAccommodation=(id)=>{const a=accommodations.find(x=>x.id===id);if(!confirmDelete(`Remover hospedagem "${a?.nome}"?`))return;setAccommodations(p=>p.filter(a=>a.id!==id));logChange(`Hospedagem removida: ${a?.nome}`);};
 
   const tabs=[{key:"profissionais",label:"👥 Profissionais"},{key:"dashboard",label:"📊 Balanço"},{key:"clients",label:"📥 Clientes"},{key:"expenses",label:"💸 Gastos"},{key:"studio",label:"🏢 Estúdio"},{key:"subscriptions",label:"🔁 Assinaturas"},{key:"reimbursements",label:"🔄 Reembolsos"}];
 
@@ -680,7 +729,8 @@ function AppContent({ onLogout, userEmail }) {
   const clientJobs = (clientId) => jobs.filter(j=>j.clientId===clientId);
   const jobCaches = (jobId) => caches.filter(c=>c.jobId===jobId);
   const jobExpenses = (jobId) => projectExpenses.filter(e=>e.jobId===jobId);
-  const jobCostTotal = (jobId) => jobCaches(jobId).reduce((s,c)=>s+cacheTotal(c),0) + jobExpenses(jobId).reduce((s,e)=>s+Number(e.value),0);
+  const jobAccommodations = (jobId) => accommodations.filter(a=>a.jobId===jobId);
+  const jobCostTotal = (jobId) => jobCaches(jobId).reduce((s,c)=>s+cacheTotal(c),0) + jobExpenses(jobId).reduce((s,e)=>s+Number(e.value),0) + jobAccommodations(jobId).reduce((s,a)=>s+Number(a.value),0);
   const clientTotals = (clientId) => {
     const cjobs = clientJobs(clientId);
     const totalValue = cjobs.reduce((s,j)=>s+Number(j.value),0);
@@ -696,6 +746,7 @@ function AppContent({ onLogout, userEmail }) {
   const currentJobColor = currentJob ? getColor(currentJob.id) : "#a78bfa";
   const currentJobCaches = selectedJob ? jobCaches(selectedJob) : [];
   const currentJobExpList = selectedJob ? jobExpenses(selectedJob) : [];
+  const currentJobAccommodations = selectedJob ? jobAccommodations(selectedJob) : [];
   const currentJobTotal = selectedJob ? jobCostTotal(selectedJob) : 0;
   const expBySource = useMemo(()=>{const g={};currentJobExpList.forEach(e=>{if(!g[e.source])g[e.source]=[];g[e.source].push(e);});return g;},[currentJobExpList]);
 
@@ -719,16 +770,17 @@ function AppContent({ onLogout, userEmail }) {
       {editingId&&editingId.startsWith("client:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setClients(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome do cliente"}]}/>}
       {editingId&&editingId.startsWith("job:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
-        setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
+        setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate),produtoraRate:Number(editData.produtoraRate||0),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
         setEditingId(null);setEditData({});
-      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
+      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"produtoraRate",label:"💼 % que fica para a produtora",type:"number"},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
       {editingId&&editingId.startsWith("reimb:")&&<EditModal editData={editData} setEditData={setEditData} color="#fb923c" onSave={()=>saveEdit("reimb",setReimbursements)} onCancel={cancelEdit} fields={[{key:"pessoa",label:"Pessoa"},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"devolvidoPara",label:"Devolvido para",type:"select",options:REIMB_SOURCES},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["pendente","recebido"]}]}/>}
       {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
         setCaches(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),alimentacao:Number(editData.alimentacao||0),logistica:Number(editData.logistica||0),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
         cancelEdit();
       }} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula)"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
-      {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"Data do trabalho",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
+      {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"📅 De",type:"date"},{key:"dateFim",label:"📅 Até (opcional)",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
+      {editingId&&editingId.startsWith("accommodation:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("accommodation",setAccommodations)} onCancel={cancelEdit} fields={[{key:"tipo",label:"Tipo",type:"select",options:["Hotel","Airbnb","Pousada","Outro"]},{key:"nome",label:"Nome do local"},{key:"link",label:"Link da reserva"},{key:"checkIn",label:"Check-in",type:"date"},{key:"checkOut",label:"Check-out",type:"date"},{key:"hospedes",label:"Nº de hóspedes",type:"number"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
@@ -751,6 +803,7 @@ function AppContent({ onLogout, userEmail }) {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:11,color:savedIndicator?"#22c55e":"#334155",transition:"color .3s"}}>{savedIndicator?"✅ Salvo":"💾 Auto-save ativo"}</span>
+              {syncNotice&&<span style={{fontSize:11,color:"#22d3ee"}}>🔄 Atualizado em outro dispositivo</span>}
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
                 {isSavingNow?"Salvando...":"💾 Salvar agora"}
               </button>
@@ -1107,8 +1160,9 @@ function AppContent({ onLogout, userEmail }) {
                       {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>(<button key={opt.label} onClick={()=>setFormJob(p=>({...p,nfRate:opt.value}))} style={{flex:1,padding:"6px 8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:formJob.nfRate===opt.value?"#f87171":"transparent",color:formJob.nfRate===opt.value?"#fff":"#475569"}}>{opt.label}</button>))}
                     </div>
                   </div>
-                  <Select label="Status" value={formJob.status} onChange={v=>setFormJob(p=>({...p,status:v}))} options={JOB_STATUS}/>
+                  <Input label="💼 % que fica para a produtora" type="number" value={formJob.produtoraRate} onChange={v=>setFormJob(p=>({...p,produtoraRate:v}))}/>
                 </Row>
+                <Select label="Status" value={formJob.status} onChange={v=>setFormJob(p=>({...p,status:v}))} options={JOB_STATUS}/>
                 <Input label="Nº contrato / link da proposta (opcional)" value={formJob.contrato} onChange={v=>setFormJob(p=>({...p,contrato:v}))}/>
                 <Input label="Observações (opcional)" value={formJob.notes} onChange={v=>setFormJob(p=>({...p,notes:v}))}/>
                 <AddBtn onClick={addJob} color="#a78bfa">+ Adicionar Job</AddBtn>
@@ -1160,15 +1214,24 @@ function AppContent({ onLogout, userEmail }) {
             <div style={{background:"#1e1e2e",border:`2px solid ${currentJobColor}33`,borderRadius:16,padding:"20px",marginBottom:16}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:12,height:12,borderRadius:"50%",background:currentJobColor}}/><h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>{currentJob.desc}</h2></div>
-                <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
-                  {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>{const active=Number(currentJob.nfRate)===opt.value;return(<button key={opt.label} onClick={()=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,nfRate:opt.value}:j))} style={{padding:"5px 11px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:active?"#f87171":"transparent",color:active?"#fff":"#475569"}}>{opt.label}</button>);})}
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
+                    {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>{const active=Number(currentJob.nfRate)===opt.value;return(<button key={opt.label} onClick={()=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,nfRate:opt.value}:j))} style={{padding:"5px 11px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:active?"#f87171":"transparent",color:active?"#fff":"#475569"}}>{opt.label}</button>);})}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:11,color:"#64748b"}}>💼 % produtora</span>
+                    <input type="number" value={currentJob.produtoraRate||0} onChange={e=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,produtoraRate:Number(e.target.value)}:j))} style={{width:60,background:"#0f0f13",border:"1px solid #ffffff20",borderRadius:6,padding:"5px 8px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
+                  </div>
                 </div>
               </div>
-              {(()=>{const clientVal=Number(currentJob.value)||0;const rate=Number(currentJob.nfRate)||0;const nf=clientVal*rate;const liquido=clientVal-nf;const margem=liquido-currentJobTotal;const payments=Array.isArray(currentJob.payments)?currentJob.payments:[];const paidFromList=payments.reduce((s,p)=>s+Number(p.value),0);const jaRecebido=paidFromList>0?paidFromList:Number(currentJob.valorRecebido||0);const saldoDevedor=clientVal-jaRecebido;return(<>
+              {(()=>{const clientVal=Number(currentJob.value)||0;const rate=Number(currentJob.nfRate)||0;const nf=clientVal*rate;const liquido=clientVal-nf;const margem=liquido-currentJobTotal;const produtoraPct=Number(currentJob.produtoraRate||0);const produtoraCut=liquido*(produtoraPct/100);const payments=Array.isArray(currentJob.payments)?currentJob.payments:[];const paidFromList=payments.reduce((s,p)=>s+Number(p.value),0);const jaRecebido=paidFromList>0?paidFromList:Number(currentJob.valorRecebido||0);const saldoDevedor=clientVal-jaRecebido;return(<>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                   <div style={{background:"#34d39910",border:"1px solid #34d39930",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>Valor do job</div><div style={{fontSize:16,fontWeight:700,color:"#34d399"}}>{formatBRL(clientVal)}</div><div style={{fontSize:10,color:statusColor[currentJob.status]}}>{currentJob.status}</div></div>
                   <div style={{background:rate>0?"#f8717115":"#ffffff08",border:`1px solid ${rate>0?"#f8717130":"#ffffff10"}`,borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>Nota Fiscal{rate>0?` (${rate*100}%)`:""}</div><div style={{fontSize:16,fontWeight:700,color:rate>0?"#f87171":"#334155"}}>{rate>0?`− ${formatBRL(nf)}`:"Sem desconto"}</div></div>
                 </div>
+                {produtoraPct>0&&(
+                  <div style={{background:"#a78bfa12",border:"1px solid #a78bfa33",borderRadius:10,padding:"10px 12px",marginBottom:10}}><div style={{fontSize:11,color:"#64748b"}}>💼 Fica para a produtora ({produtoraPct}% do líquido)</div><div style={{fontSize:16,fontWeight:700,color:"#a78bfa"}}>{formatBRL(produtoraCut)}</div></div>
+                )}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                   <div style={{background:"#22c55e12",border:"1px solid #22c55e33",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>✅ Já recebido</div><div style={{fontSize:16,fontWeight:700,color:"#22c55e"}}>{formatBRL(jaRecebido)}</div></div>
                   <div style={{background:saldoDevedor>0?"#f59e0b12":"#22c55e12",border:`1px solid ${saldoDevedor>0?"#f59e0b33":"#22c55e33"}`,borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>⏳ Saldo devedor</div><div style={{fontSize:16,fontWeight:700,color:saldoDevedor>0?"#f59e0b":"#22c55e"}}>{formatBRL(saldoDevedor)}</div></div>
@@ -1220,7 +1283,7 @@ function AppContent({ onLogout, userEmail }) {
             </div>
 
             <div style={{display:"flex",gap:8,marginBottom:16}}>
-              {[{key:"equipe",label:"👥 Equipe & Cachês"},{key:"gastos",label:"💸 Despesas do Job"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#1e1e2e",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
+              {[{key:"equipe",label:"👥 Equipe & Cachês"},{key:"gastos",label:"💸 Despesas do Job"},{key:"hotel",label:"🏨 Hotel/Airbnb"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);setShowAddAccommodation(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#1e1e2e",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
             </div>
 
             {jobSubTab==="equipe"&&(
@@ -1313,7 +1376,14 @@ function AppContent({ onLogout, userEmail }) {
 
             {jobSubTab==="gastos"&&(
               <div>
-                <button onClick={()=>setShowAddExpense(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddExpense?"#1e1e2e":"#f8717122",border:"1px solid #f8717144",borderRadius:12,color:"#f87171",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddExpense?"▲ Fechar":"＋ Adicionar despesa"}</button>
+                <button onClick={()=>setShowAddExpense(v=>{
+                  const next=!v;
+                  if(next && currentJob){
+                    const jobDate = currentJob.workDates?.[0] || currentJob.dateWork || "";
+                    setFormProjExp(p=>({...p,dateWork:jobDate}));
+                  }
+                  return next;
+                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddExpense?"#1e1e2e":"#f8717122",border:"1px solid #f8717144",borderRadius:12,color:"#f87171",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddExpense?"▲ Fechar":"＋ Adicionar despesa"}</button>
                 {showAddExpense&&(
                   <div style={{background:"#1e1e2e",border:"1px solid #f8717133",borderRadius:14,padding:20,marginBottom:16}}>
                     <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#f87171"}}>Nova Despesa</h3>
@@ -1322,7 +1392,8 @@ function AppContent({ onLogout, userEmail }) {
                         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{EXPENSE_TYPES.map(t=>(<button key={t} onClick={()=>setFormProjExp(p=>({...p,type:t}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formProjExp.type===t?"#f87171":"#f8717120",color:formProjExp.type===t?"#fff":"#f87171"}}>{TYPE_ICON[t]} {t}</button>))}</div>
                       </div>
                       <Input label="Descrição (opcional)" value={formProjExp.desc} onChange={v=>setFormProjExp(p=>({...p,desc:v}))}/>
-                      <Row><Input label="Valor (R$)" type="number" value={formProjExp.value} onChange={v=>setFormProjExp(p=>({...p,value:v}))}/><Input label="📅 Data do trabalho" type="date" value={formProjExp.dateWork} onChange={v=>setFormProjExp(p=>({...p,dateWork:v}))}/></Row>
+                      <Input label="Valor (R$)" type="number" value={formProjExp.value} onChange={v=>setFormProjExp(p=>({...p,value:v}))}/>
+                      <Row><Input label="📅 De (já vem da realização do job)" type="date" value={formProjExp.dateWork} onChange={v=>setFormProjExp(p=>({...p,dateWork:v}))}/><Input label="📅 Até (opcional)" type="date" value={formProjExp.dateFim} onChange={v=>setFormProjExp(p=>({...p,dateFim:v}))}/></Row>
                       <Input label="💰 Data de pagamento" type="date" value={formProjExp.datePay} onChange={v=>setFormProjExp(p=>({...p,datePay:v}))}/>
                       <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>De onde saiu o dinheiro</div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{PAYMENT_SOURCES.map(s=>{const cor=SOURCE_COLOR[s]||"#94a3b8";const sel=formProjExp.source===s;return(<button key={s} onClick={()=>setFormProjExp(p=>({...p,source:s}))} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#000":cor,border:`1px solid ${cor}66`}}>{s}</button>);})}</div>
@@ -1346,7 +1417,7 @@ function AppContent({ onLogout, userEmail }) {
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {items.map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
                         <span style={{fontSize:18}}>{TYPE_ICON[item.type]||"📦"}</span>
-                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#a78bfa",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
+                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#a78bfa",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
                         <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
                         <button onClick={()=>toggleStatus(projectExpenses,setProjectExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
                         <button onClick={()=>startEdit("projexp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
@@ -1356,6 +1427,52 @@ function AppContent({ onLogout, userEmail }) {
                   </div>);
                 })}
                 {currentJobExpList.length>0&&<SummaryPill label="Total despesas do job" value={currentJobExpList.reduce((s,e)=>s+Number(e.value),0)} color="#f87171"/>}
+              </div>
+            )}
+
+            {jobSubTab==="hotel"&&(
+              <div>
+                <button onClick={()=>setShowAddAccommodation(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddAccommodation?"#1e1e2e":"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:12,color:"#22d3ee",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddAccommodation?"▲ Fechar":"＋ Adicionar hospedagem"}</button>
+                {showAddAccommodation&&(
+                  <div style={{background:"#1e1e2e",border:"1px solid #22d3ee33",borderRadius:14,padding:20,marginBottom:16}}>
+                    <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#22d3ee"}}>Nova Hospedagem</h3>
+                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Tipo</div>
+                        <div style={{display:"flex",gap:6}}>{["Hotel","Airbnb","Pousada","Outro"].map(t=>(<button key={t} onClick={()=>setFormAccommodation(p=>({...p,tipo:t}))} style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formAccommodation.tipo===t?"#22d3ee":"#22d3ee20",color:formAccommodation.tipo===t?"#fff":"#22d3ee"}}>{t==="Hotel"?"🏨":t==="Airbnb"?"🏠":t==="Pousada"?"🏡":"📍"} {t}</button>))}</div>
+                      </div>
+                      <Input label="Nome do local (ex: Hotel Ibis Centro)" value={formAccommodation.nome} onChange={v=>setFormAccommodation(p=>({...p,nome:v}))}/>
+                      <Input label="Link da reserva (opcional)" value={formAccommodation.link} onChange={v=>setFormAccommodation(p=>({...p,link:v}))}/>
+                      <Row><Input label="📅 Check-in" type="date" value={formAccommodation.checkIn} onChange={v=>setFormAccommodation(p=>({...p,checkIn:v}))}/><Input label="📅 Check-out" type="date" value={formAccommodation.checkOut} onChange={v=>setFormAccommodation(p=>({...p,checkOut:v}))}/></Row>
+                      <Row><Input label="👥 Nº de hóspedes" type="number" value={formAccommodation.hospedes} onChange={v=>setFormAccommodation(p=>({...p,hospedes:v}))}/><Input label="💰 Valor total (R$)" type="number" value={formAccommodation.value} onChange={v=>setFormAccommodation(p=>({...p,value:v}))}/></Row>
+                      <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>De onde saiu o dinheiro</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{PAYMENT_SOURCES.map(s=>{const cor=SOURCE_COLOR[s]||"#94a3b8";const sel=formAccommodation.source===s;return(<button key={s} onClick={()=>setFormAccommodation(p=>({...p,source:s}))} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#000":cor,border:`1px solid ${cor}66`}}>{s}</button>);})}</div>
+                      </div>
+                      <Select label="Status" value={formAccommodation.status} onChange={v=>setFormAccommodation(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
+                      <AddBtn onClick={addAccommodation} color="#22d3ee">+ Adicionar hospedagem</AddBtn>
+                    </div>
+                  </div>
+                )}
+                {currentJobAccommodations.length===0&&!showAddAccommodation&&<div style={{textAlign:"center",color:"#475569",padding:40,fontSize:13}}>Nenhuma hospedagem lançada. <span style={{color:"#22d3ee",cursor:"pointer"}} onClick={()=>setShowAddAccommodation(true)}>+ Adicionar</span></div>}
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {currentJobAccommodations.map(item=>{
+                    const nights = item.checkIn && item.checkOut ? Math.max(1, Math.round((new Date(item.checkOut)-new Date(item.checkIn))/(1000*60*60*24))) : null;
+                    return(<div key={item.id} style={{background:"#1e1e2e",border:"1px solid #22d3ee22",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:20}}>{item.tipo==="Hotel"?"🏨":item.tipo==="Airbnb"?"🏠":item.tipo==="Pousada"?"🏡":"📍"}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{item.nome}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                          {item.checkIn&&<span>📅 {item.checkIn}</span>}{item.checkOut&&<span> → {item.checkOut}</span>}{nights&&<span> · {nights} noite{nights>1?"s":""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}
+                        </div>
+                        <div style={{fontSize:10,color:"#475569",marginTop:1}}>💳 {item.source}</div>
+                      </div>
+                      <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
+                      <button onClick={()=>toggleStatus(accommodations,setAccommodations,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
+                      <button onClick={()=>startEdit("accommodation",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                      <button onClick={()=>removeAccommodation(item.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
+                    </div>);
+                  })}
+                </div>
+                {currentJobAccommodations.length>0&&<SummaryPill label="Total hospedagem do job" value={currentJobAccommodations.reduce((s,a)=>s+Number(a.value),0)} color="#22d3ee"/>}
               </div>
             )}
           </div>
