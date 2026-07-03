@@ -1,19 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-
-// ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
-const firebaseConfig = {
-  apiKey: "AIzaSyClpflkp4vwKG4TUwgnaCAF-z3YqXa-4s8",
-  authDomain: "frames-system.firebaseapp.com",
-  projectId: "frames-system",
-  storageBucket: "frames-system.firebasestorage.app",
-  messagingSenderId: "488046203697",
-  appId: "1:488046203697:web:2f3ddda7b333d96c6c5610",
-};
-const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const DOC_REF = doc(db, "produtora", "framesbr");
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
 const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Gasolina","Gastos extras","Outro"];
@@ -188,21 +173,11 @@ function migrateOldData(old, defaults) {
   };
 }
 
-let lastSavedHash = null;
-let onStorageError = null; // set by the App component so errors can be shown on screen
-function hashData(data) {
-  const str = JSON.stringify(data);
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; }
-  return hash;
-}
-
 async function loadFromStorage(defaults) {
   try {
-    const snap = await getDoc(DOC_REF);
-    if (snap.exists()) {
-      const saved = snap.data();
-      lastSavedHash = hashData(saved);
+    const result = await window.storage.get(STORAGE_KEY);
+    if (result && result.value) {
+      const saved = JSON.parse(result.value);
       return {
         expenses: saved.expenses ?? [],
         clients: saved.clients ?? defaults.clients,
@@ -211,46 +186,31 @@ async function loadFromStorage(defaults) {
         freelancers: saved.freelancers ?? defaults.freelancers,
         caches: saved.caches ?? defaults.caches,
         projectExpenses: saved.projectExpenses ?? defaults.projectExpenses,
-        studioExpenses: saved.studioExpenses ?? [],
-        subscriptions: saved.subscriptions ?? [],
       };
     }
-  } catch(e) { console.error("Erro ao carregar do Firebase:", e); if(onStorageError) onStorageError(`Erro ao CARREGAR: ${e.code||e.message||e}`); }
+  } catch(e) {}
 
-  // No cloud data found — try migrating from the legacy artifact export (window.storage),
-  // if the person imported it via localStorage, so nothing already edited is lost.
+  // No v2 data found — try migrating from the old v1 structure so nothing the user already edited is lost.
   try {
-    const legacyRaw = window.localStorage.getItem("framesbr-legacy-import");
-    if (legacyRaw) {
-      const old = JSON.parse(legacyRaw);
+    const oldResult = await window.storage.get(OLD_STORAGE_KEY);
+    if (oldResult && oldResult.value) {
+      const old = JSON.parse(oldResult.value);
       const migrated = migrateOldData(old, defaults);
       await saveToStorage(migrated);
-      window.localStorage.removeItem("framesbr-legacy-import");
       return migrated;
     }
-  } catch(e) { console.error("Erro na migração de dados antigos:", e); }
+  } catch(e) {}
 
-  return { ...defaults, studioExpenses: [], subscriptions: [] };
+  return defaults;
 }
 
 async function saveToStorage(data) {
-  try {
-    const newHash = hashData(data);
-    if (newHash === lastSavedHash) return; // nothing changed, skip write
-    await setDoc(DOC_REF, data, { merge: false });
-    lastSavedHash = newHash;
-    if(onStorageError) onStorageError(null);
-  } catch(e) {
-    console.error("Erro ao salvar no Firebase:", e);
-    if(onStorageError) onStorageError(`Erro ao SALVAR: ${e.code||e.message||e}`);
-  }
+  try { await window.storage.set(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
-  const [saveError, setSaveError] = useState(null);
-  useEffect(() => { onStorageError = (msg) => setSaveError(msg); return () => { onStorageError = null; }; }, []);
 
   const [tab, setTab] = useState("dashboard");
   const [dashSubTab, setDashSubTab] = useState("geral");
@@ -388,25 +348,7 @@ export default function App() {
       await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
       setSavedIndicator(true);
       setTimeout(() => setSavedIndicator(false), 2000);
-    }, 1200);
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
-
-  // Force an immediate save if the person closes the tab, refreshes, or switches
-  // away before the debounce timer above has fired — prevents losing the last
-  // edit made right before navigating away.
-  useEffect(() => {
-    if (!loaded) return;
-    const flush = () => {
-      clearTimeout(saveTimer.current);
-      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
-    };
-    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
-    window.addEventListener("beforeunload", flush);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("beforeunload", flush);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
+    }, 4000);
   }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
 
   const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",dateWork:today(),datePay:"",status:"a pagar"};
@@ -646,14 +588,6 @@ export default function App() {
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
 
-      {/* Error banner — shows real Firebase errors directly on screen, no devtools needed */}
-      {saveError && (
-        <div style={{background:"#7f1d1d",borderBottom:"2px solid #ef4444",padding:"10px 20px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:200}}>
-          <span style={{fontSize:16}}>🔴</span>
-          <div style={{flex:1,fontSize:12,color:"#fecaca"}}><strong>Problema ao salvar/carregar:</strong> {saveError}</div>
-          <button onClick={()=>setSaveError(null)} style={{background:"transparent",border:"1px solid #fecaca66",color:"#fecaca",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>Fechar</button>
-        </div>
-      )}
       {/* Header */}
       <div style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",borderBottom:"1px solid #ffffff12",padding:"24px 24px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto"}}>
