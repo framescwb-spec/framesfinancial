@@ -436,6 +436,12 @@ function AppContent({ onLogout, userEmail }) {
           // servidor — ela já está refletida na tela, reprocessar de novo não
           // muda nada e só gastaria tempo.
           if (snap.metadata.hasPendingWrites) return;
+          // Se o usuário acabou de fazer uma alteração local que ainda não
+          // terminou de salvar, NÃO aplica os dados remotos agora — isso
+          // evitaria sobrescrever a mudança recém-feita com uma versão antiga
+          // vinda do servidor. O próprio salvamento local vai atualizar o
+          // servidor em instantes, e a sincronização volta a valer depois disso.
+          if (hasPendingLocalChanges.current) return;
           const saved = snap.data();
           lastSavedHash = hashData(saved); // evita que o auto-save regrave o que acabou de chegar
           applyLoadedData(saved);
@@ -456,6 +462,11 @@ function AppContent({ onLogout, userEmail }) {
   }, []);
 
   const saveTimer = useRef(null);
+  // Trava que impede a sincronização em tempo real de sobrescrever alterações
+  // locais que ainda não terminaram de ser salvas — evita que um cliente/job
+  // recém-adicionado "suma" da tela por causa de uma atualização remota
+  // desatualizada chegando no meio do caminho.
+  const hasPendingLocalChanges = useRef(false);
   const [isSavingNow, setIsSavingNow] = useState(false);
 
   const exportPdfSummary = () => {
@@ -511,6 +522,7 @@ function AppContent({ onLogout, userEmail }) {
   const saveNow = async () => {
     setIsSavingNow(true);
     const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+    hasPendingLocalChanges.current = false;
     setIsSavingNow(false);
     if (ok) {
       setSavedIndicator(true);
@@ -520,9 +532,11 @@ function AppContent({ onLogout, userEmail }) {
 
   useEffect(() => {
     if (!loaded) return;
+    hasPendingLocalChanges.current = true;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      hasPendingLocalChanges.current = false;
       if (ok) {
         setSavedIndicator(true);
         setTimeout(() => setSavedIndicator(false), 2000);
