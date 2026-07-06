@@ -772,13 +772,13 @@ function AppContent({ onLogout, userEmail }) {
   const expBySource = useMemo(()=>{const g={};currentJobExpList.forEach(e=>{if(!g[e.source])g[e.source]=[];g[e.source].push(e);});return g;},[currentJobExpList]);
 
   if (!loaded) return (
-    <div style={{background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#4D7CFE",fontSize:16,fontFamily:"Inter,sans-serif"}}>
+    <div style={{background:"#050507",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#4D7CFE",fontSize:16,fontFamily:"Inter,sans-serif"}}>
       <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",letterSpacing:"-0.5px",marginBottom:10}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</div><div style={{fontSize:12,color:"#52525B"}}>Carregando dados…</div></div>
     </div>
   );
 
   return (
-    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",color:"#EDEDEF",paddingBottom:80}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#050507",minHeight:"100vh",color:"#EDEDEF",paddingBottom:80}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         @media (max-width: 480px) {
@@ -790,19 +790,23 @@ function AppContent({ onLogout, userEmail }) {
         * { box-sizing: border-box; }
         ::selection { background: #4D7CFE44; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #09090B; }
+        ::-webkit-scrollbar-track { background: #050507; }
         ::-webkit-scrollbar-thumb { background: #232329; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #2E2E36; }
         .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
         button { transition: opacity .15s, background .15s, border-color .15s; }
         button:hover { opacity: .88; }
         input:focus, select:focus { border-color: #4D7CFE66 !important; box-shadow: 0 0 0 3px #4D7CFE15; }
-        /* ── Premium touches (Suno/Artlist-inspired) ── */
-        .glow-top { position: fixed; top: -240px; left: 50%; transform: translateX(-50%); width: 720px; height: 480px; background: radial-gradient(ellipse at center, #4D7CFE14 0%, transparent 65%); pointer-events: none; z-index: 0; }
-        .premium-card { position: relative; background: linear-gradient(180deg, #101016 0%, #0C0C10 100%) !important; }
-        .premium-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #4D7CFE33, transparent 40%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
-        .btn-primary { background: linear-gradient(135deg, #5B8AFF 0%, #3D6BEE 100%) !important; box-shadow: 0 4px 20px #4D7CFE33, inset 0 1px 0 #ffffff22 !important; }
-        .btn-primary:hover { box-shadow: 0 6px 28px #4D7CFE55, inset 0 1px 0 #ffffff22 !important; opacity: 1 !important; }
+        /* ── Site look: FRAMES/BR design system ── */
+        .glow-top { position: fixed; top: -260px; left: 50%; transform: translateX(-50%); width: 900px; height: 600px; background: radial-gradient(ellipse at center, #4D7CFE18 0%, #8B5CF60A 40%, transparent 65%); pointer-events: none; z-index: 0; }
+        .premium-card { position: relative; background: linear-gradient(145deg, #0C0C10 0%, #101018 100%) !important; overflow: hidden; transition: border-color .25s, transform .25s !important; }
+        .premium-card::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #4D7CFE, #8B5CF6, transparent); opacity: 0; transition: opacity .25s; }
+        .premium-card:hover { border-color: #4D7CFE44 !important; transform: translateY(-3px); }
+        .premium-card:hover::after { opacity: 1; }
+        .btn-primary { background: linear-gradient(135deg, #4D7CFE 0%, #8B5CF6 100%) !important; box-shadow: 0 4px 20px #4D7CFE33 !important; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 32px #4D7CFE44 !important; opacity: 1 !important; }
+        .grad-text { background: linear-gradient(135deg, #fff 30%, #4D7CFE 70%, #8B5CF6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .sec-tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: #4D7CFE; }
       `}</style>
       <div className="glow-top"/>
       {editingId&&editingId.startsWith("client:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setClients(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome do cliente"}]}/>}
@@ -832,12 +836,12 @@ function AppContent({ onLogout, userEmail }) {
         </div>
       )}
       {/* Header */}
-      <div style={{background:"#09090B",borderBottom:"1px solid #1C1C22",padding:"20px 24px 0"}}>
+      <div style={{background:"#05050799",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderBottom:"1px solid #ffffff08",padding:"20px 24px 0",position:"sticky",top:0,zIndex:90}}>
         <div style={{maxWidth:820,margin:"0 auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
             <div style={{display:"flex",alignItems:"baseline",gap:12}}>
               <h1 style={{margin:0,fontSize:20,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
-              <span className="mono" style={{fontSize:10,color:"#52525B",letterSpacing:"2px",textTransform:"uppercase"}}>Financial System</span>
+              <span className="sec-tag">Financial System</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span className="mono" style={{fontSize:10,color:savedIndicator?"#22c55e":"#3F3F46",transition:"color .3s",letterSpacing:"1px",textTransform:"uppercase"}}>{savedIndicator?"● Salvo":"○ Auto-save"}</span>
@@ -880,7 +884,7 @@ function AppContent({ onLogout, userEmail }) {
             )}
           </div>
           <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-            {tabs.map(t=>(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"10px 14px",border:"none",borderBottom:tab===t.key?"2px solid #4D7CFE":"2px solid transparent",cursor:"pointer",fontSize:12,fontWeight:tab===t.key?600:500,background:"transparent",color:tab===t.key?"#fff":"#71717A",transition:"all .15s"}}>{t.label}</button>))}
+            {tabs.map(t=>(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"10px 14px",border:"none",borderBottom:"2px solid transparent",borderImage:tab===t.key?"linear-gradient(90deg,#4D7CFE,#8B5CF6) 1":"none",cursor:"pointer",fontSize:12,fontWeight:tab===t.key?600:500,background:"transparent",color:tab===t.key?"#fff":"#71717A",transition:"all .15s"}}>{t.label}</button>))}
           </div>
         </div>
       </div>
@@ -910,8 +914,8 @@ function AppContent({ onLogout, userEmail }) {
                   <button onClick={()=>setShowMeta(v=>!v)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:12,cursor:"pointer"}}>{showMeta?"▲ Fechar":"✏️ Definir meta"}</button>
                 </div>
                 {showMeta&&(<div style={{display:"flex",gap:8,marginBottom:meta.value?12:0}}>
-                  <div style={{flex:1}}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Valor da meta (R$)</div><input type="number" value={meta.value} onChange={e=>setMeta(p=>({...p,value:e.target.value}))} placeholder="Ex: 50000" style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
-                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Período</div><select value={meta.period} onChange={e=>setMeta(p=>({...p,period:e.target.value}))} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="mensal">Mensal</option><option value="anual">Anual</option></select></div>
+                  <div style={{flex:1}}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Valor da meta (R$)</div><input type="number" value={meta.value} onChange={e=>setMeta(p=>({...p,value:e.target.value}))} placeholder="Ex: 50000" style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Período</div><select value={meta.period} onChange={e=>setMeta(p=>({...p,period:e.target.value}))} style={{background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="mensal">Mensal</option><option value="anual">Anual</option></select></div>
                 </div>)}
                 {Number(meta.value)>0&&(()=>{const pct=Math.min((totals.totalReceivables/Number(meta.value))*100,100);return(<div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b",marginBottom:6}}><span>{formatBRL(totals.totalReceivables)} de {formatBRL(meta.value)} ({meta.period})</span><span style={{color:pct>=100?"#22c55e":pct>=50?"#f59e0b":"#f87171",fontWeight:700}}>{pct.toFixed(0)}%</span></div>
@@ -937,7 +941,7 @@ function AppContent({ onLogout, userEmail }) {
                   return ranked.map(({cl,ct,avgDays},i)=>{
                     const cor=getColor(cl.id);
                     const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
-                    return(<div key={cl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#09090B88",borderRadius:10,border:`1px solid ${cor}22`}}>
+                    return(<div key={cl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#05050788",borderRadius:10,border:`1px solid ${cor}22`}}>
                       <span style={{fontSize:i<3?16:13,minWidth:24,textAlign:"center"}}>{medal}</span>
                       <div style={{width:8,height:8,borderRadius:"50%",background:cor,flexShrink:0}}/>
                       <div style={{flex:1}}>
@@ -970,7 +974,7 @@ function AppContent({ onLogout, userEmail }) {
                     const flIdx=freelancers.findIndex(f=>f.id===fl.id);
                     const cor=getColor(flIdx);
                     const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
-                    return(<div key={fl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#09090B88",borderRadius:10,border:`1px solid ${cor}22`}}>
+                    return(<div key={fl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#05050788",borderRadius:10,border:`1px solid ${cor}22`}}>
                       <span style={{fontSize:i<3?16:13,minWidth:24,textAlign:"center"}}>{medal}</span>
                       <div style={{width:32,height:32,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:cor,flexShrink:0}}>{fl.apelido?fl.apelido.slice(0,3):fl.name[0]}</div>
                       <div style={{flex:1}}>
@@ -1053,7 +1057,7 @@ function AppContent({ onLogout, userEmail }) {
             {dashSubTab==="mensal"&&(
               <div>
                 <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16}}>
-                  <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
+                  <div style={{display:"flex",gap:4,background:"#050507",borderRadius:8,padding:4}}>
                     {[{key:"caixa",label:"💵 Caixa"},{key:"competencia",label:"📋 Competência"}].map(m=>(
                       <button key={m.key} onClick={()=>setMonthMode(m.key)} style={{padding:"6px 14px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:monthMode===m.key?"#4D7CFE":"transparent",color:monthMode===m.key?"#fff":"#475569"}}>{m.label}</button>
                     ))}
@@ -1181,7 +1185,7 @@ function AppContent({ onLogout, userEmail }) {
                     {(!formJob.workDates||formJob.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária adicionada ainda.</span>}
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <input type="date" id="newWorkDateInput" defaultValue={today()} style={{flex:1,background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}/>
+                    <input type="date" id="newWorkDateInput" defaultValue={today()} style={{flex:1,background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}/>
                     <button onClick={()=>{
                       const input=document.getElementById("newWorkDateInput");
                       const val=input.value;
@@ -1194,7 +1198,7 @@ function AppContent({ onLogout, userEmail }) {
                 <Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>({...p,dateDueExpected:v}))}/>
                 <Row>
                   <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Nota Fiscal</div>
-                    <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
+                    <div style={{display:"flex",gap:4,background:"#050507",borderRadius:8,padding:4}}>
                       {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>(<button key={opt.label} onClick={()=>setFormJob(p=>({...p,nfRate:opt.value}))} style={{flex:1,padding:"6px 8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:formJob.nfRate===opt.value?"#f87171":"transparent",color:formJob.nfRate===opt.value?"#fff":"#475569"}}>{opt.label}</button>))}
                     </div>
                   </div>
@@ -1253,12 +1257,12 @@ function AppContent({ onLogout, userEmail }) {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:12,height:12,borderRadius:"50%",background:currentJobColor}}/><h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>{currentJob.desc}</h2></div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
+                  <div style={{display:"flex",gap:4,background:"#050507",borderRadius:8,padding:4}}>
                     {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>{const active=Number(currentJob.nfRate)===opt.value;return(<button key={opt.label} onClick={()=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,nfRate:opt.value}:j))} style={{padding:"5px 11px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:active?"#f87171":"transparent",color:active?"#fff":"#475569"}}>{opt.label}</button>);})}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:11,color:"#64748b"}}>💼 % produtora</span>
-                    <input type="number" value={currentJob.produtoraRate||0} onChange={e=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,produtoraRate:Number(e.target.value)}:j))} style={{width:60,background:"#09090B",border:"1px solid #ffffff20",borderRadius:6,padding:"5px 8px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
+                    <input type="number" value={currentJob.produtoraRate||0} onChange={e=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,produtoraRate:Number(e.target.value)}:j))} style={{width:60,background:"#050507",border:"1px solid #ffffff20",borderRadius:6,padding:"5px 8px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
                   </div>
                 </div>
               </div>
@@ -1275,7 +1279,7 @@ function AppContent({ onLogout, userEmail }) {
                   <div style={{background:saldoDevedor>0?"#f59e0b12":"#22c55e12",border:`1px solid ${saldoDevedor>0?"#f59e0b33":"#22c55e33"}`,borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>⏳ Saldo devedor</div><div style={{fontSize:16,fontWeight:700,color:saldoDevedor>0?"#f59e0b":"#22c55e"}}>{formatBRL(saldoDevedor)}</div></div>
                 </div>
                 {/* Histórico de pagamentos parciais */}
-                <div style={{background:"#09090B66",border:"1px solid #18181D",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                <div style={{background:"#05050766",border:"1px solid #18181D",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:payments.length>0?8:0}}>
                     <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>💵 Pagamentos recebidos</span>
                     <button onClick={()=>{
@@ -1356,8 +1360,8 @@ function AppContent({ onLogout, userEmail }) {
                             {(!formCache.workDates||formCache.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária ainda.</span>}
                           </div>
                           <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
-                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>De</div><input type="date" id="cacheRangeStart" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
-                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Até</div><input type="date" id="cacheRangeEnd" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>De</div><input type="date" id="cacheRangeStart" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Até</div><input type="date" id="cacheRangeEnd" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
                             <button onClick={()=>{
                               const start=document.getElementById("cacheRangeStart").value;
                               const end=document.getElementById("cacheRangeEnd").value;
@@ -1441,7 +1445,7 @@ function AppContent({ onLogout, userEmail }) {
                       <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Forma de pagamento</div>
                         <div style={{display:"flex",gap:8,alignItems:"center"}}>
                           {["à vista","parcelado"].map(pt=>(<button key={pt} onClick={()=>setFormProjExp(p=>({...p,paymentType:pt}))} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formProjExp.paymentType===pt?"#4D7CFE":"#4D7CFE22",color:formProjExp.paymentType===pt?"#fff":"#4D7CFE"}}>{pt==="à vista"?"💵 À vista":"📆 Parcelado"}</button>))}
-                          {formProjExp.paymentType==="parcelado"&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:12,color:"#64748b"}}>Parcelas:</span><select value={formProjExp.parcelas} onChange={e=>setFormProjExp(p=>({...p,parcelas:e.target.value}))} style={{background:"#09090B",border:"1px solid #ffffff20",borderRadius:6,padding:"4px 8px",color:"#e2e8f0",fontSize:12}}>{["2","3","4","5","6","7","8","9","10","11","12"].map(n=><option key={n}>{n}x</option>)}</select></div>}
+                          {formProjExp.paymentType==="parcelado"&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:12,color:"#64748b"}}>Parcelas:</span><select value={formProjExp.parcelas} onChange={e=>setFormProjExp(p=>({...p,parcelas:e.target.value}))} style={{background:"#050507",border:"1px solid #ffffff20",borderRadius:6,padding:"4px 8px",color:"#e2e8f0",fontSize:12}}>{["2","3","4","5","6","7","8","9","10","11","12"].map(n=><option key={n}>{n}x</option>)}</select></div>}
                         </div>
                       </div>
                       <Select label="Status" value={formProjExp.status} onChange={v=>setFormProjExp(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
@@ -1517,7 +1521,7 @@ function AppContent({ onLogout, userEmail }) {
                             const job=jobs.find(j=>j.id===c.jobId);
                             const client=job?clients.find(cl=>cl.id===job.clientId):null;
                             const cTotal=cacheTotal(c);
-                            return(<div key={c.id} style={{background:"#09090B",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                            return(<div key={c.id} style={{background:"#050507",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                               <div style={{width:6,height:6,borderRadius:"50%",background:cor,flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <span style={{color:"#e2e8f0",fontWeight:500}}>{job?.desc||"—"}</span>
@@ -1594,7 +1598,7 @@ function AppContent({ onLogout, userEmail }) {
               <Row><Input label="💰 Data pagamento" type="date" value={formE.datePay} onChange={v=>setFormE(p=>({...p,datePay:v}))}/><Select label="Categoria" value={formE.category} onChange={v=>setFormE(p=>({...p,category:v}))} options={CATEGORIES_EXPENSE}/></Row>
               <Row>
                 <Select label="Natureza" value={formE.natureza||"overhead"} onChange={v=>setFormE(p=>({...p,natureza:v,jobId:v==="overhead"?"":p.jobId}))} options={["overhead","vinculado a job"]}/>
-                {(formE.natureza==="vinculado a job")&&<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job</div><select value={formE.jobId||""} onChange={e=>setFormE(p=>({...p,jobId:Number(e.target.value)}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="">Selecione...</option>{jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}</select></div>}
+                {(formE.natureza==="vinculado a job")&&<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job</div><select value={formE.jobId||""} onChange={e=>setFormE(p=>({...p,jobId:Number(e.target.value)}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="">Selecione...</option>{jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}</select></div>}
               </Row>
               <Select label="Status" value={formE.status} onChange={v=>setFormE(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
               <AddBtn onClick={addExpense}>+ Adicionar</AddBtn>
@@ -1737,16 +1741,16 @@ function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#050507",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');`}</style>
-      <div style={{position:"absolute",top:"-30%",left:"50%",transform:"translateX(-50%)",width:700,height:600,background:"radial-gradient(ellipse at center, #4D7CFE1A 0%, transparent 62%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",top:"-30%",left:"50%",transform:"translateX(-50%)",width:900,height:600,background:"radial-gradient(ellipse at center, #4D7CFE22 0%, #8B5CF610 40%, transparent 65%)",pointerEvents:"none"}}/>
       <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"linear-gradient(180deg,#101016 0%,#0C0C10 100%)",border:"1px solid #232330",borderRadius:12,padding:36,width:"100%",maxWidth:380,position:"relative",boxShadow:"0 24px 80px #00000066, 0 0 60px #4D7CFE0D"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <h1 style={{margin:0,fontSize:24,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
           <p style={{margin:"6px 0 0",fontSize:10,color:"#52525B",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"3px",textTransform:"uppercase"}}>Financial System</p>
           <p style={{margin:"14px 0 0",fontSize:12,color:"#71717A"}}>{mode==="login"?"Faça login para continuar":"Crie sua conta gratuita"}</p>
         </div>
-        <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4,marginBottom:20}}>
+        <div style={{display:"flex",gap:4,background:"#050507",borderRadius:8,padding:4,marginBottom:20}}>
           <button type="button" onClick={()=>{setMode("login");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="login"?"#4D7CFE":"transparent",color:mode==="login"?"#fff":"#64748b"}}>Entrar</button>
           <button type="button" onClick={()=>{setMode("signup");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="signup"?"#4D7CFE":"transparent",color:mode==="signup"?"#fff":"#64748b"}}>Criar conta</button>
         </div>
@@ -1754,21 +1758,21 @@ function LoginScreen({ onLoginSuccess }) {
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>E-mail</div>
           <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"
-            style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         <div style={{marginBottom:mode==="signup"?12:20}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Senha</div>
           <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" minLength={mode==="signup"?6:undefined}
-            style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         {mode==="signup" && (
           <div style={{marginBottom:20}}>
             <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Confirmar senha</div>
             <input type="password" required value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="••••••••"
-              style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
           </div>
         )}
-        <button type="submit" disabled={loading} style={{width:"100%",background:"linear-gradient(135deg,#5B8AFF 0%,#3D6BEE 100%)",boxShadow:"0 4px 20px #4D7CFE33, inset 0 1px 0 #ffffff22",color:"#fff",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
+        <button type="submit" disabled={loading} style={{width:"100%",background:"linear-gradient(135deg,#4D7CFE 0%,#8B5CF6 100%)",boxShadow:"0 4px 20px #4D7CFE33",color:"#fff",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
           {loading?(mode==="login"?"Entrando...":"Criando conta..."):(mode==="login"?"Entrar":"Criar conta")}
         </button>
         {mode==="signup" && <p style={{margin:"14px 0 0",fontSize:11,color:"#475569",textAlign:"center"}}>Sua conta começa com dados em branco, separados de qualquer outra conta.</p>}
@@ -1791,7 +1795,7 @@ export default function App() {
 
   if (user === undefined) {
     return (
-      <div style={{fontFamily:"'Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b"}}>
+      <div style={{fontFamily:"'Inter',sans-serif",background:"#050507",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b"}}>
         <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",letterSpacing:"-0.5px",marginBottom:10}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</div><div style={{fontSize:12,color:"#52525B"}}>Verificando login…</div></div>
       </div>
     );
@@ -1816,9 +1820,9 @@ function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE"}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {fields.map(f=>(f.type==="select"
             ?<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <select value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
+              <select value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
             :<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
           ))}
         </div>
         <div style={{display:"flex",gap:8,marginTop:16}}>
@@ -1832,6 +1836,6 @@ function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE"}
 function SummaryPill({label,value,color}){return(<div style={{background:color+"15",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:12,color:"#94a3b8"}}>{label}</span><span style={{fontSize:16,fontWeight:700,color}}>{Number(value).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>);}
 function FormCard({title,color,children}){return(<div style={{background:"#101014",border:`1px solid ${color}22`,borderRadius:10,padding:20,marginBottom:20}}><h3 style={{margin:"0 0 16px",fontSize:14,fontWeight:600,color}}>{title}</h3><div style={{display:"flex",flexDirection:"column",gap:10}}>{children}</div></div>);}
 function Row({children}){return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{children}</div>;}
-function Input({label,value,onChange,type="text"}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>);}
-function Select({label,value,onChange,options}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{options.map(o=><option key={String(o)} value={o}>{o}</option>)}</select></div>);}
-function AddBtn({onClick,color="#f87171",children}){return(<button onClick={onClick} style={{background:color,color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",marginTop:4}}>{children}</button>);}
+function Input({label,value,onChange,type="text"}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>);}
+function Select({label,value,onChange,options}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{options.map(o=><option key={String(o)} value={o}>{o}</option>)}</select></div>);}
+function AddBtn({onClick,color="#f87171",children}){const isAccent=color==="#4D7CFE";return(<button onClick={onClick} className={isAccent?"btn-primary":undefined} style={{background:isAccent?undefined:color,color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",marginTop:4}}>{children}</button>);}
