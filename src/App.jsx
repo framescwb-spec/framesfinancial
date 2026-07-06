@@ -38,7 +38,7 @@ const REIMB_SOURCES = ["Frames","Ivan","Japa"];
 
 const formatBRL = (v) => Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const today = () => new Date().toISOString().split("T")[0];
-const AVATAR_COLORS = ["#818cf8","#fb923c","#f472b6","#34d399","#22d3ee","#facc15","#a78bfa","#f87171","#4ade80","#38bdf8"];
+const AVATAR_COLORS = ["#818cf8","#fb923c","#f472b6","#34d399","#22d3ee","#facc15","#4D7CFE","#f87171","#4ade80","#38bdf8"];
 const getColor = (idx) => AVATAR_COLORS[Math.abs(idx) % AVATAR_COLORS.length];
 const SOURCE_COLOR = {"Cartão Frames":"#facc15","Cartão Japa":"#22d3ee","Cartão Ivan":"#f472b6","Dinheiro":"#34d399","Pix/Transferência":"#818cf8"};
 const TYPE_ICON = {"Logística":"🚛","Alimentação":"🍽️","Uber":"🚗","Voo":"✈️","Hotel/Airbnb":"🏨","Gasolina":"⛽","Gastos extras":"💳","Outro":"📦"};
@@ -486,7 +486,7 @@ function AppContent({ onLogout, userEmail }) {
       y += 6;
     };
 
-    addTitle("🎥 FramesBR Financial System");
+    addTitle("FRAMES/BR — Financial System");
     addSubtitle(`Resumo gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`);
 
     addSectionHeader("Balanço Geral");
@@ -660,7 +660,7 @@ function AppContent({ onLogout, userEmail }) {
     });
     caches.filter(c=>c.dateDue&&c.dateDue>=todayStr&&c.dateDue<=d30Str&&c.status!=="pago").forEach(c=>{
       const fl=freelancers.find(f=>f.id===c.freelancerId);const job=jobs.find(j=>j.id===c.jobId);
-      items.push({tipo:"Pagar cachê",desc:`${fl?.apelido||fl?.name||"?"} — ${job?.desc||"?"}`,value:cacheTotal(c),datePay:c.dateDue,color:"#a78bfa",icon:"👤"});
+      items.push({tipo:"Pagar cachê",desc:`${fl?.apelido||fl?.name||"?"} — ${job?.desc||"?"}`,value:cacheTotal(c),datePay:c.dateDue,color:"#4D7CFE",icon:"👤"});
     });
     reimbursements.filter(r=>r.datePay&&r.datePay>=todayStr&&r.datePay<=d30Str&&r.status!=="recebido").forEach(r=>{
       items.push({tipo:"Reembolso",desc:`${r.pessoa} — ${r.desc}`,value:r.value,datePay:r.datePay,color:"#fb923c",icon:"🔄"});
@@ -746,7 +746,7 @@ function AppContent({ onLogout, userEmail }) {
   const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:Date.now(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
   const removeSubscription=(id)=>{const e=subscriptions.find(x=>x.id===id);if(!confirmDelete(`Remover assinatura "${e?.desc}"?`))return;setSubscriptions(p=>p.filter(e=>e.id!==id));logChange(`Assinatura removida: ${e?.desc}`);};
 
-  const tabs=[{key:"profissionais",label:"👥 Profissionais"},{key:"dashboard",label:"📊 Balanço"},{key:"clients",label:"📥 Clientes"},{key:"expenses",label:"💸 Gastos"},{key:"studio",label:"🏢 Estúdio"},{key:"subscriptions",label:"🔁 Assinaturas"},{key:"reimbursements",label:"🔄 Reembolsos"}];
+  const tabs=[{key:"profissionais",label:"Profissionais"},{key:"dashboard",label:"Balanço"},{key:"clients",label:"Clientes"},{key:"expenses",label:"Gastos"},{key:"studio",label:"Estúdio"},{key:"subscriptions",label:"Assinaturas"},{key:"reimbursements",label:"Reembolsos"}];
 
   // ── Derived: client / job helpers ──
   const clientJobs = (clientId) => jobs.filter(j=>j.clientId===clientId);
@@ -765,28 +765,38 @@ function AppContent({ onLogout, userEmail }) {
 
   const currentClient = selectedClient ? clients.find(c=>c.id===selectedClient) : null;
   const currentJob = selectedJob ? jobs.find(j=>j.id===selectedJob) : null;
-  const currentJobColor = currentJob ? getColor(currentJob.id) : "#a78bfa";
+  const currentJobColor = currentJob ? getColor(currentJob.id) : "#4D7CFE";
   const currentJobCaches = selectedJob ? jobCaches(selectedJob) : [];
   const currentJobExpList = selectedJob ? jobExpenses(selectedJob) : [];
   const currentJobTotal = selectedJob ? jobCostTotal(selectedJob) : 0;
   const expBySource = useMemo(()=>{const g={};currentJobExpList.forEach(e=>{if(!g[e.source])g[e.source]=[];g[e.source].push(e);});return g;},[currentJobExpList]);
 
   if (!loaded) return (
-    <div style={{background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#a78bfa",fontSize:16,fontFamily:"Inter,sans-serif"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🎥</div><div>Carregando dados salvos...</div></div>
+    <div style={{background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#4D7CFE",fontSize:16,fontFamily:"Inter,sans-serif"}}>
+      <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",letterSpacing:"-0.5px",marginBottom:10}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</div><div style={{fontSize:12,color:"#52525B"}}>Carregando dados…</div></div>
     </div>
   );
 
   return (
-    <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",color:"#e2e8f0",paddingBottom:80}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",color:"#EDEDEF",paddingBottom:80}}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         @media (max-width: 480px) {
           .grid-2 { grid-template-columns: 1fr !important; }
           .hide-mobile { display: none !important; }
           .font-large { font-size: 14px !important; }
         }
-        input, select, button { -webkit-tap-highlight-color: transparent; }
+        input, select, button { -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk','Inter',sans-serif; }
         * { box-sizing: border-box; }
+        ::selection { background: #4D7CFE44; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #09090B; }
+        ::-webkit-scrollbar-thumb { background: #232329; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2E2E36; }
+        .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+        button { transition: opacity .15s, background .15s, border-color .15s; }
+        button:hover { opacity: .88; }
+        input:focus, select:focus { border-color: #4D7CFE66 !important; }
       `}</style>
       {editingId&&editingId.startsWith("client:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setClients(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome do cliente"}]}/>}
       {editingId&&editingId.startsWith("job:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{
@@ -795,7 +805,7 @@ function AppContent({ onLogout, userEmail }) {
         setEditingId(null);setEditData({});
       }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"produtoraRate",label:"💼 % que fica para a produtora",type:"number"},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
       {editingId&&editingId.startsWith("reimb:")&&<EditModal editData={editData} setEditData={setEditData} color="#fb923c" onSave={()=>saveEdit("reimb",setReimbursements)} onCancel={cancelEdit} fields={[{key:"pessoa",label:"Pessoa"},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"devolvidoPara",label:"Devolvido para",type:"select",options:REIMB_SOURCES},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["pendente","recebido"]}]}/>}
-      {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{
+      {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
         setCaches(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),alimentacao:Number(editData.alimentacao||0),logistica:Number(editData.logistica||0),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
         cancelEdit();
@@ -804,7 +814,7 @@ function AppContent({ onLogout, userEmail }) {
       {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
-      {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#a78bfa" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
+      {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
 
       {/* Error banner — shows real Firebase errors directly on screen, no devtools needed */}
       {saveError && (
@@ -815,54 +825,55 @@ function AppContent({ onLogout, userEmail }) {
         </div>
       )}
       {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",borderBottom:"1px solid #ffffff12",padding:"24px 24px 0"}}>
+      <div style={{background:"#09090B",borderBottom:"1px solid #1C1C22",padding:"20px 24px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <h1 style={{margin:0,fontSize:22,fontWeight:700,color:"#fff"}}>🎥 FramesBR <span style={{color:"#a78bfa"}}>Financial System</span></h1>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+              <h1 style={{margin:0,fontSize:20,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
+              <span className="mono" style={{fontSize:10,color:"#52525B",letterSpacing:"2px",textTransform:"uppercase"}}>Financial System</span>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:11,color:savedIndicator?"#22c55e":"#334155",transition:"color .3s"}}>{savedIndicator?"✅ Salvo":"💾 Auto-save ativo"}</span>
-              {syncNotice&&<span style={{fontSize:11,color:"#22d3ee"}}>🔄 Atualizado em outro dispositivo</span>}
-              <button onClick={saveNow} disabled={isSavingNow} style={{background:"#34d39922",border:"1px solid #34d39944",color:"#34d399",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.6:1}}>
-                {isSavingNow?"Salvando...":"💾 Salvar agora"}
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span className="mono" style={{fontSize:10,color:savedIndicator?"#22c55e":"#3F3F46",transition:"color .3s",letterSpacing:"1px",textTransform:"uppercase"}}>{savedIndicator?"● Salvo":"○ Auto-save"}</span>
+              {syncNotice&&<span className="mono" style={{fontSize:10,color:"#22d3ee",letterSpacing:"1px"}}>⟳ SYNC</span>}
+              <button onClick={saveNow} disabled={isSavingNow} style={{background:"transparent",border:"1px solid #232329",color:"#A1A1AA",borderRadius:6,padding:"6px 14px",fontSize:11,fontWeight:500,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.5:1}}>
+                {isSavingNow?"Salvando…":"Salvar"}
               </button>
-              <button onClick={exportPdfSummary} style={{background:"#facc1522",border:"1px solid #facc1544",color:"#facc15",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
-                📄 Baixar Resumo PDF
+              <button onClick={exportPdfSummary} style={{background:"transparent",border:"1px solid #232329",color:"#A1A1AA",borderRadius:6,padding:"6px 14px",fontSize:11,fontWeight:500,cursor:"pointer"}}>
+                Exportar PDF
               </button>
-              <div style={{width:1,height:16,background:"#ffffff20"}}/>
-              <span style={{fontSize:11,color:"#64748b"}}>{userEmail}</span>
-              <button onClick={onLogout} style={{background:"#ef444422",border:"1px solid #ef444444",color:"#f87171",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
-                🚪 Sair
+              <div style={{width:1,height:14,background:"#232329"}}/>
+              <span className="mono" style={{fontSize:10,color:"#52525B"}}>{userEmail}</span>
+              <button onClick={onLogout} style={{background:"transparent",border:"1px solid #232329",color:"#71717A",borderRadius:6,padding:"6px 12px",fontSize:11,fontWeight:500,cursor:"pointer"}}>
+                Sair
               </button>
             </div>
           </div>
           {/* Search bar */}
-          <div style={{position:"relative",marginBottom:12}}>
+          <div style={{position:"relative",marginBottom:14}}>
             <input
-              placeholder="🔍 Buscar clientes, jobs, profissionais..."
+              placeholder="Buscar clientes, jobs, profissionais…"
               value={searchQuery}
               onChange={e=>setSearchQuery(e.target.value)}
-              style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff20",borderRadius:10,padding:"8px 14px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}
+              style={{width:"100%",background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:8,padding:"9px 14px",color:"#EDEDEF",fontSize:13,outline:"none",boxSizing:"border-box"}}
             />
             {searchResults&&searchResults.length>0&&(
-              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1e1e2e",border:"1px solid #ffffff20",borderRadius:10,zIndex:50,marginTop:4,overflow:"hidden"}}>
+              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#101014",border:"1px solid #232329",borderRadius:8,zIndex:50,marginTop:4,overflow:"hidden",boxShadow:"0 8px 32px #00000088"}}>
                 {searchResults.map((r,i)=>(
-                  <div key={i} onClick={()=>{r.action();setSearchQuery("");}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ffffff08",display:"flex",alignItems:"center",gap:10}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#ffffff08"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <span style={{fontSize:10,background:"#a78bfa22",color:"#a78bfa",borderRadius:4,padding:"2px 6px",flexShrink:0}}>{r.type}</span>
-                    <span style={{fontSize:13,color:"#e2e8f0"}}>{r.label}</span>
-                    {r.sub&&<span style={{fontSize:11,color:"#64748b"}}>{r.sub}</span>}
+                  <div key={i} onClick={()=>{r.action();setSearchQuery("");}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ffffff06",display:"flex",alignItems:"center",gap:10}}
+                    onMouseEnter={e=>e.currentTarget.style.background="#ffffff06"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <span className="mono" style={{fontSize:9,background:"#4D7CFE18",color:"#4D7CFE",borderRadius:4,padding:"2px 6px",flexShrink:0,letterSpacing:"1px",textTransform:"uppercase"}}>{r.type}</span>
+                    <span style={{fontSize:13,color:"#EDEDEF"}}>{r.label}</span>
+                    {r.sub&&<span style={{fontSize:11,color:"#52525B"}}>{r.sub}</span>}
                   </div>
                 ))}
               </div>
             )}
             {searchResults&&searchResults.length===0&&searchQuery&&(
-              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1e1e2e",border:"1px solid #ffffff20",borderRadius:10,zIndex:50,marginTop:4,padding:"12px 14px",fontSize:13,color:"#64748b"}}>Nenhum resultado para "{searchQuery}"</div>
+              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#101014",border:"1px solid #232329",borderRadius:8,zIndex:50,marginTop:4,padding:"12px 14px",fontSize:13,color:"#52525B"}}>Nenhum resultado para "{searchQuery}"</div>
             )}
           </div>
-          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-            {tabs.map(t=>(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"8px 14px",border:"none",cursor:"pointer",fontSize:12,fontWeight:500,background:tab===t.key?"#a78bfa":"transparent",color:tab===t.key?"#fff":"#94a3b8",borderRadius:"8px 8px 0 0",transition:"all .15s"}}>{t.label}</button>))}
+          <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+            {tabs.map(t=>(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"10px 14px",border:"none",borderBottom:tab===t.key?"2px solid #4D7CFE":"2px solid transparent",cursor:"pointer",fontSize:12,fontWeight:tab===t.key?600:500,background:"transparent",color:tab===t.key?"#fff":"#71717A",transition:"all .15s"}}>{t.label}</button>))}
           </div>
         </div>
       </div>
@@ -873,34 +884,34 @@ function AppContent({ onLogout, userEmail }) {
         {tab==="dashboard"&&(
           <div>
             <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-              {[{key:"geral",label:"📊 Geral"},{key:"apagar",label:"💳 A Pagar"},{key:"vencimentos",label:"📅 Vencimentos"},{key:"mensal",label:"📈 Por Mês"}].map(st=>(<button key={st.key} onClick={()=>setDashSubTab(st.key)} style={{padding:"8px 16px",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,borderRadius:8,background:dashSubTab===st.key?"#a78bfa":"#1e1e2e",color:dashSubTab===st.key?"#fff":"#64748b"}}>{st.label}{st.key==="apagar"&&weeklyAPagar.length>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,marginLeft:6}}>{weeklyAPagar.length}</span>}</button>))}
+              {[{key:"geral",label:"Geral"},{key:"apagar",label:"A Pagar"},{key:"vencimentos",label:"Vencimentos"},{key:"mensal",label:"Por Mês"}].map(st=>(<button key={st.key} onClick={()=>setDashSubTab(st.key)} style={{padding:"8px 16px",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,borderRadius:8,background:dashSubTab===st.key?"#4D7CFE":"#101014",color:dashSubTab===st.key?"#fff":"#64748b"}}>{st.label}{st.key==="apagar"&&weeklyAPagar.length>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,marginLeft:6}}>{weeklyAPagar.length}</span>}</button>))}
             </div>
             {dashSubTab==="geral"&&(<>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-                {[{label:"Saldo Atual",value:totals.balance,color:totals.balance>=0?"#22c55e":"#ef4444",sub:"recebido − gastos − cachês pagos − reembolsos pagos"},{label:"Projetado Líquido",value:totals.projected,color:"#a78bfa",sub:`após NF (${formatBRL(totals.totalNF)}) − todos os custos`},{label:"Clientes (total bruto)",value:totals.totalReceivables,color:"#34d399",sub:`${formatBRL(totals.received)} já recebido`},{label:"Gastos nos projetos",value:totals.totalProjExp+totals.totalCaches,color:"#f87171",sub:`${formatBRL(totals.cachesAPagar)} cachês a pagar`},{label:"Custo fixo mensal",value:totals.totalFixedMonthly,color:"#22d3ee",sub:`${formatBRL(totals.studioFixedMonthly)} estúdio · ${formatBRL(totals.subsFixedMonthly)} assinaturas`}].map(c=>(
-                  <div key={c.label} style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"18px 20px"}}>
-                    <div style={{fontSize:12,color:"#64748b",marginBottom:4}}>{c.label}</div>
-                    <div style={{fontSize:22,fontWeight:700,color:c.color}}>{formatBRL(c.value)}</div>
-                    <div style={{fontSize:11,color:"#475569",marginTop:4}}>{c.sub}</div>
+                {[{label:"Saldo Atual",value:totals.balance,color:totals.balance>=0?"#22c55e":"#ef4444",sub:"recebido − gastos − cachês pagos − reembolsos pagos"},{label:"Projetado Líquido",value:totals.projected,color:"#4D7CFE",sub:`após NF (${formatBRL(totals.totalNF)}) − todos os custos`},{label:"Clientes (total bruto)",value:totals.totalReceivables,color:"#34d399",sub:`${formatBRL(totals.received)} já recebido`},{label:"Gastos nos projetos",value:totals.totalProjExp+totals.totalCaches,color:"#f87171",sub:`${formatBRL(totals.cachesAPagar)} cachês a pagar`},{label:"Custo fixo mensal",value:totals.totalFixedMonthly,color:"#22d3ee",sub:`${formatBRL(totals.studioFixedMonthly)} estúdio · ${formatBRL(totals.subsFixedMonthly)} assinaturas`}].map(c=>(
+                  <div key={c.label} style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:"18px 20px"}}>
+                    <div className="mono" style={{fontSize:10,color:"#52525B",marginBottom:6,letterSpacing:"1.5px",textTransform:"uppercase"}}>{c.label}</div>
+                    <div className="mono" style={{fontSize:22,fontWeight:600,color:c.color}}>{formatBRL(c.value)}</div>
+                    <div style={{fontSize:11,color:"#3F3F46",marginTop:5}}>{c.sub}</div>
                   </div>
                 ))}
               </div>
               {/* Meta de faturamento */}
-              <div style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"16px 20px",marginBottom:16}}>
+              <div style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"16px 20px",marginBottom:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showMeta&&meta.value?12:showMeta?12:0}}>
                   <span style={{fontSize:13,fontWeight:600,color:"#cbd5e1"}}>🎯 Meta de faturamento</span>
                   <button onClick={()=>setShowMeta(v=>!v)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:12,cursor:"pointer"}}>{showMeta?"▲ Fechar":"✏️ Definir meta"}</button>
                 </div>
                 {showMeta&&(<div style={{display:"flex",gap:8,marginBottom:meta.value?12:0}}>
-                  <div style={{flex:1}}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Valor da meta (R$)</div><input type="number" value={meta.value} onChange={e=>setMeta(p=>({...p,value:e.target.value}))} placeholder="Ex: 50000" style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
-                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Período</div><select value={meta.period} onChange={e=>setMeta(p=>({...p,period:e.target.value}))} style={{background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="mensal">Mensal</option><option value="anual">Anual</option></select></div>
+                  <div style={{flex:1}}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Valor da meta (R$)</div><input type="number" value={meta.value} onChange={e=>setMeta(p=>({...p,value:e.target.value}))} placeholder="Ex: 50000" style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Período</div><select value={meta.period} onChange={e=>setMeta(p=>({...p,period:e.target.value}))} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="mensal">Mensal</option><option value="anual">Anual</option></select></div>
                 </div>)}
                 {Number(meta.value)>0&&(()=>{const pct=Math.min((totals.totalReceivables/Number(meta.value))*100,100);return(<div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b",marginBottom:6}}><span>{formatBRL(totals.totalReceivables)} de {formatBRL(meta.value)} ({meta.period})</span><span style={{color:pct>=100?"#22c55e":pct>=50?"#f59e0b":"#f87171",fontWeight:700}}>{pct.toFixed(0)}%</span></div>
                   <div style={{background:"#ffffff0f",borderRadius:6,height:10,overflow:"hidden"}}><div style={{background:pct>=100?"#22c55e":pct>=50?"#f59e0b":"#f87171",height:"100%",width:`${pct}%`,borderRadius:6,transition:"width .5s"}}/></div>
                 </div>);})()}
               </div>
-              <div style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"20px",marginBottom:16}}>
+              <div style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"20px",marginBottom:16}}>
                 <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#cbd5e1"}}>🏢 Balanço por cliente</h3>
                 {(()=>{
                   const ranked = clients
@@ -919,7 +930,7 @@ function AppContent({ onLogout, userEmail }) {
                   return ranked.map(({cl,ct,avgDays},i)=>{
                     const cor=getColor(cl.id);
                     const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
-                    return(<div key={cl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#0f0f1388",borderRadius:10,border:`1px solid ${cor}22`}}>
+                    return(<div key={cl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#09090B88",borderRadius:10,border:`1px solid ${cor}22`}}>
                       <span style={{fontSize:i<3?16:13,minWidth:24,textAlign:"center"}}>{medal}</span>
                       <div style={{width:8,height:8,borderRadius:"50%",background:cor,flexShrink:0}}/>
                       <div style={{flex:1}}>
@@ -934,7 +945,7 @@ function AppContent({ onLogout, userEmail }) {
                   });
                 })()}
               </div>
-              <div style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"20px"}}>
+              <div style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"20px"}}>
                 <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#cbd5e1"}}>👥 Profissionais por cachê recebido</h3>
                 {(()=>{
                   const ranked = freelancers
@@ -952,7 +963,7 @@ function AppContent({ onLogout, userEmail }) {
                     const flIdx=freelancers.findIndex(f=>f.id===fl.id);
                     const cor=getColor(flIdx);
                     const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
-                    return(<div key={fl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#0f0f1388",borderRadius:10,border:`1px solid ${cor}22`}}>
+                    return(<div key={fl.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"10px 12px",background:"#09090B88",borderRadius:10,border:`1px solid ${cor}22`}}>
                       <span style={{fontSize:i<3?16:13,minWidth:24,textAlign:"center"}}>{medal}</span>
                       <div style={{width:32,height:32,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:cor,flexShrink:0}}>{fl.apelido?fl.apelido.slice(0,3):fl.name[0]}</div>
                       <div style={{flex:1}}>
@@ -967,7 +978,7 @@ function AppContent({ onLogout, userEmail }) {
                   });
                 })()}
               </div>
-              {changeLog.length>0&&<div style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"20px",marginTop:16}}>
+              {changeLog.length>0&&<div style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"20px",marginTop:16}}>
                 <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#cbd5e1"}}>🕐 Histórico de alterações</h3>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {changeLog.map((l,i)=>(<div key={i} style={{display:"flex",gap:10,alignItems:"center",fontSize:12,padding:"6px 0",borderBottom:"1px solid #ffffff06"}}>
@@ -991,7 +1002,7 @@ function AppContent({ onLogout, userEmail }) {
                       {weeklyAPagar.map(c=>{
                         const cor=getColor(freelancers.findIndex(f=>f.id===c.freelancerId));
                         const daysLeft=c.dateDue?Math.ceil((new Date(c.dateDue)-new Date(today()))/(1000*60*60*24)):null;
-                        return(<div key={c.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                        return(<div key={c.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
                           <div style={{width:36,height:36,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:cor,flexShrink:0}}>{c.flApelido.slice(0,3)}</div>
                           <div style={{flex:1}}>
                             <div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{c.flName}</div>
@@ -1017,7 +1028,7 @@ function AppContent({ onLogout, userEmail }) {
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {upcomingPayments.map((item,i)=>{
                     const daysLeft=Math.ceil((new Date(item.datePay)-new Date(today()))/(1000*60*60*24));
-                    return(<div key={i} style={{background:"#1e1e2e",border:`1px solid ${item.color}33`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    return(<div key={i} style={{background:"#101014",border:`1px solid ${item.color}33`,borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
                       <span style={{fontSize:18}}>{item.icon}</span>
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.desc}</div>
@@ -1035,9 +1046,9 @@ function AppContent({ onLogout, userEmail }) {
             {dashSubTab==="mensal"&&(
               <div>
                 <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16}}>
-                  <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
+                  <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
                     {[{key:"caixa",label:"💵 Caixa"},{key:"competencia",label:"📋 Competência"}].map(m=>(
-                      <button key={m.key} onClick={()=>setMonthMode(m.key)} style={{padding:"6px 14px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:monthMode===m.key?"#a78bfa":"transparent",color:monthMode===m.key?"#fff":"#475569"}}>{m.label}</button>
+                      <button key={m.key} onClick={()=>setMonthMode(m.key)} style={{padding:"6px 14px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:monthMode===m.key?"#4D7CFE":"transparent",color:monthMode===m.key?"#fff":"#475569"}}>{m.label}</button>
                     ))}
                   </div>
                   <span style={{fontSize:11,color:"#475569"}}>{monthMode==="caixa"?"Quando o dinheiro se moveu de fato":"Quando o trabalho foi realizado"}</span>
@@ -1050,7 +1061,7 @@ function AppContent({ onLogout, userEmail }) {
                   return monthlyData.map(m=>{
                     const saidas=m.expenses+m.caches+m.projExp+m.reimb;
                     const saldo=m.income-saidas;
-                    return(<div key={m.key} style={{background:"#1e1e2e",border:"1px solid #ffffff0f",borderRadius:14,padding:"18px 20px",marginBottom:12}}>
+                    return(<div key={m.key} style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"18px 20px",marginBottom:12}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                         <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>{monthLabel(m.key)}</span>
                         <span style={{fontSize:16,fontWeight:700,color:saldo>=0?"#22c55e":"#ef4444"}}>{formatBRL(saldo)}</span>
@@ -1062,7 +1073,7 @@ function AppContent({ onLogout, userEmail }) {
                         <div style={{background:"#ffffff0f",borderRadius:4,height:8,overflow:"hidden"}}><div style={{background:"#f87171",height:"100%",width:`${(saidas/maxVal)*100}%`,borderRadius:4,transition:"width .3s"}}/></div>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                        {m.caches>0&&<div style={{background:"#a78bfa10",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#64748b"}}>👥 Cachês</div><div style={{fontSize:13,fontWeight:600,color:"#a78bfa"}}>{formatBRL(m.caches)}</div></div>}
+                        {m.caches>0&&<div style={{background:"#4D7CFE10",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#64748b"}}>👥 Cachês</div><div style={{fontSize:13,fontWeight:600,color:"#4D7CFE"}}>{formatBRL(m.caches)}</div></div>}
                         {m.projExp>0&&<div style={{background:"#fb923c10",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#64748b"}}>🧾 Despesas proj.</div><div style={{fontSize:13,fontWeight:600,color:"#fb923c"}}>{formatBRL(m.projExp)}</div></div>}
                         {m.reimb>0&&<div style={{background:"#f59e0b10",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#64748b"}}>🔄 Reembolsos</div><div style={{fontSize:13,fontWeight:600,color:"#f59e0b"}}>{formatBRL(m.reimb)}</div></div>}
                       </div>
@@ -1078,7 +1089,7 @@ function AppContent({ onLogout, userEmail }) {
         {tab==="clients"&&!selectedClient&&(
           <div>
             <p style={{fontSize:13,color:"#64748b",margin:"0 0 16px"}}>Selecione um cliente para ver e gerenciar os projetos/jobs dele. Arraste um cliente para cima de outro para transformá-lo em projeto dele.</p>
-            <button onClick={()=>setShowAddClient(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddClient?"#1e1e2e":"#34d39922",border:"1px solid #34d39944",borderRadius:12,color:"#34d399",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddClient?"▲ Fechar":"＋ Adicionar cliente"}</button>
+            <button onClick={()=>setShowAddClient(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddClient?"#101014":"#34d39922",border:"1px solid #34d39944",borderRadius:10,color:"#34d399",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddClient?"▲ Fechar":"＋ Adicionar cliente"}</button>
             {showAddClient&&(
               <FormCard title="Novo Cliente" color="#34d399">
                 <Input label="Nome do cliente" value={formClient.name} onChange={v=>setFormClient(p=>({...p,name:v}))}/>
@@ -1098,7 +1109,7 @@ function AppContent({ onLogout, userEmail }) {
                   onDragLeave={()=>setDragOverClientId(p=>p===cl.id?null:p)}
                   onDrop={(e)=>{e.preventDefault();if(draggedClientId!==null&&draggedClientId!==cl.id){mergeClientIntoClient(draggedClientId,cl.id);}setDraggedClientId(null);setDragOverClientId(null);}}
                   onClick={()=>{setSelectedClient(cl.id);setSelectedJob(null);}}
-                  style={{background:"#1e1e2e",border:isDragOver?`2px dashed ${cor}`:`2px solid ${cor}33`,borderRadius:14,padding:"16px 18px",cursor:"grab",display:"flex",alignItems:"center",gap:14,opacity:isDragging?0.4:1,transition:"opacity .15s, border-color .15s"}}>
+                  style={{background:"#101014",border:isDragOver?`2px dashed ${cor}`:`2px solid ${cor}33`,borderRadius:10,padding:"16px 18px",cursor:"grab",display:"flex",alignItems:"center",gap:14,opacity:isDragging?0.4:1,transition:"opacity .15s, border-color .15s"}}>
                   <div style={{color:"#475569",fontSize:14,cursor:"grab",flexShrink:0}}>⠿</div>
                   <div style={{width:44,height:44,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:cor,flexShrink:0}}>{cl.name[0]}</div>
                   <div style={{flex:1}}>
@@ -1123,7 +1134,7 @@ function AppContent({ onLogout, userEmail }) {
           <div>
             <button onClick={()=>setSelectedClient(null)} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}}>← Voltar aos clientes</button>
             {(()=>{const ct=clientTotals(selectedClient);const cor=getColor(selectedClient);return(
-              <div style={{background:"#1e1e2e",border:`2px solid ${cor}33`,borderRadius:16,padding:"20px",marginBottom:20}}>
+              <div style={{background:"#101014",border:`2px solid ${cor}33`,borderRadius:12,padding:"20px",marginBottom:20}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:40,height:40,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:cor}}>{currentClient.name[0]}</div>
@@ -1146,37 +1157,37 @@ function AppContent({ onLogout, userEmail }) {
               </div>
             );})()}
 
-            <button onClick={()=>setShowAddJob(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddJob?"#1e1e2e":"#a78bfa22",border:"1px solid #a78bfa44",borderRadius:12,color:"#a78bfa",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddJob?"▲ Fechar":"＋ Adicionar projeto/job para este cliente"}</button>
+            <button onClick={()=>setShowAddJob(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddJob?"#101014":"#4D7CFE22",border:"1px solid #4D7CFE44",borderRadius:10,color:"#4D7CFE",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddJob?"▲ Fechar":"＋ Adicionar projeto/job para este cliente"}</button>
             {showAddJob&&(
-              <FormCard title="Novo Projeto/Job" color="#a78bfa">
+              <FormCard title="Novo Projeto/Job" color="#4D7CFE">
                 <Input label="Nome do projeto/job" value={formJob.desc} onChange={v=>setFormJob(p=>({...p,desc:v}))}/>
                 <Input label="Valor total (R$)" type="number" value={formJob.value} onChange={v=>setFormJob(p=>({...p,value:v}))}/>
                 <div>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>📅 Diárias de gravação (pode adicionar mais de uma)</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
                     {(formJob.workDates||[]).map((d,i)=>(
-                      <span key={i} style={{background:"#a78bfa22",border:"1px solid #a78bfa44",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#a78bfa",display:"flex",alignItems:"center",gap:6}}>
+                      <span key={i} style={{background:"#4D7CFE22",border:"1px solid #4D7CFE44",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#4D7CFE",display:"flex",alignItems:"center",gap:6}}>
                         {d}
-                        <button onClick={()=>setFormJob(p=>({...p,workDates:p.workDates.filter((_,x)=>x!==i)}))} style={{background:"transparent",border:"none",color:"#a78bfa",cursor:"pointer",fontSize:12,padding:0}}>✕</button>
+                        <button onClick={()=>setFormJob(p=>({...p,workDates:p.workDates.filter((_,x)=>x!==i)}))} style={{background:"transparent",border:"none",color:"#4D7CFE",cursor:"pointer",fontSize:12,padding:0}}>✕</button>
                       </span>
                     ))}
                     {(!formJob.workDates||formJob.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária adicionada ainda.</span>}
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <input type="date" id="newWorkDateInput" defaultValue={today()} style={{flex:1,background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}/>
+                    <input type="date" id="newWorkDateInput" defaultValue={today()} style={{flex:1,background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}/>
                     <button onClick={()=>{
                       const input=document.getElementById("newWorkDateInput");
                       const val=input.value;
                       if(!val)return;
                       setFormJob(p=>({...p,workDates:[...(p.workDates||[]),val].sort()}));
-                    }} style={{background:"#a78bfa",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Adicionar diária</button>
+                    }} style={{background:"#4D7CFE",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Adicionar diária</button>
                   </div>
                 </div>
                 <Row><Input label="📦 Entrega do material" type="date" value={formJob.dateDelivery} onChange={v=>setFormJob(p=>({...p,dateDelivery:v}))}/><Input label="🧾 Faturamento (NF)" type="date" value={formJob.dateInvoice} onChange={v=>setFormJob(p=>({...p,dateInvoice:v}))}/></Row>
                 <Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>({...p,dateDueExpected:v}))}/>
                 <Row>
                   <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Nota Fiscal</div>
-                    <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
+                    <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
                       {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>(<button key={opt.label} onClick={()=>setFormJob(p=>({...p,nfRate:opt.value}))} style={{flex:1,padding:"6px 8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:formJob.nfRate===opt.value?"#f87171":"transparent",color:formJob.nfRate===opt.value?"#fff":"#475569"}}>{opt.label}</button>))}
                     </div>
                   </div>
@@ -1185,7 +1196,7 @@ function AppContent({ onLogout, userEmail }) {
                 <Select label="Status" value={formJob.status} onChange={v=>setFormJob(p=>({...p,status:v}))} options={JOB_STATUS}/>
                 <Input label="Nº contrato / link da proposta (opcional)" value={formJob.contrato} onChange={v=>setFormJob(p=>({...p,contrato:v}))}/>
                 <Input label="Observações (opcional)" value={formJob.notes} onChange={v=>setFormJob(p=>({...p,notes:v}))}/>
-                <AddBtn onClick={addJob} color="#a78bfa">+ Adicionar Job</AddBtn>
+                <AddBtn onClick={addJob} color="#4D7CFE">+ Adicionar Job</AddBtn>
               </FormCard>
             )}
 
@@ -1196,7 +1207,7 @@ function AppContent({ onLogout, userEmail }) {
                 const nf=Number(job.value)*Number(job.nfRate||0);
                 const margem=Number(job.value)-nf-cost;
                 const saldoDevedor=Number(job.value)-Number(job.valorRecebido||0);
-                return(<div key={job.id} onClick={()=>setSelectedJob(job.id)} style={{background:"#1e1e2e",border:"1px solid #ffffff0a",borderRadius:12,padding:"14px 16px",cursor:"pointer"}}>
+                return(<div key={job.id} onClick={()=>setSelectedJob(job.id)} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{job.desc}{(()=>{
@@ -1231,16 +1242,16 @@ function AppContent({ onLogout, userEmail }) {
           <div>
             <button onClick={()=>{setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);}} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}}>← Voltar para {currentClient?.name}</button>
 
-            <div style={{background:"#1e1e2e",border:`2px solid ${currentJobColor}33`,borderRadius:16,padding:"20px",marginBottom:16}}>
+            <div style={{background:"#101014",border:`2px solid ${currentJobColor}33`,borderRadius:12,padding:"20px",marginBottom:16}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:12,height:12,borderRadius:"50%",background:currentJobColor}}/><h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>{currentJob.desc}</h2></div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4}}>
+                  <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4}}>
                     {[{label:"Sem NF",value:0},{label:"6%",value:0.06},{label:"12%",value:0.12}].map(opt=>{const active=Number(currentJob.nfRate)===opt.value;return(<button key={opt.label} onClick={()=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,nfRate:opt.value}:j))} style={{padding:"5px 11px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:active?"#f87171":"transparent",color:active?"#fff":"#475569"}}>{opt.label}</button>);})}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:11,color:"#64748b"}}>💼 % produtora</span>
-                    <input type="number" value={currentJob.produtoraRate||0} onChange={e=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,produtoraRate:Number(e.target.value)}:j))} style={{width:60,background:"#0f0f13",border:"1px solid #ffffff20",borderRadius:6,padding:"5px 8px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
+                    <input type="number" value={currentJob.produtoraRate||0} onChange={e=>setJobs(p=>p.map(j=>j.id===selectedJob?{...j,produtoraRate:Number(e.target.value)}:j))} style={{width:60,background:"#09090B",border:"1px solid #ffffff20",borderRadius:6,padding:"5px 8px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
                   </div>
                 </div>
               </div>
@@ -1250,14 +1261,14 @@ function AppContent({ onLogout, userEmail }) {
                   <div style={{background:rate>0?"#f8717115":"#ffffff08",border:`1px solid ${rate>0?"#f8717130":"#ffffff10"}`,borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>Nota Fiscal{rate>0?` (${rate*100}%)`:""}</div><div style={{fontSize:16,fontWeight:700,color:rate>0?"#f87171":"#334155"}}>{rate>0?`− ${formatBRL(nf)}`:"Sem desconto"}</div></div>
                 </div>
                 {produtoraPct>0&&(
-                  <div style={{background:"#a78bfa12",border:"1px solid #a78bfa33",borderRadius:10,padding:"10px 12px",marginBottom:10}}><div style={{fontSize:11,color:"#64748b"}}>💼 Fica para a produtora ({produtoraPct}% do líquido)</div><div style={{fontSize:16,fontWeight:700,color:"#a78bfa"}}>{formatBRL(produtoraCut)}</div></div>
+                  <div style={{background:"#4D7CFE12",border:"1px solid #4D7CFE33",borderRadius:10,padding:"10px 12px",marginBottom:10}}><div style={{fontSize:11,color:"#64748b"}}>💼 Fica para a produtora ({produtoraPct}% do líquido)</div><div style={{fontSize:16,fontWeight:700,color:"#4D7CFE"}}>{formatBRL(produtoraCut)}</div></div>
                 )}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                   <div style={{background:"#22c55e12",border:"1px solid #22c55e33",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>✅ Já recebido</div><div style={{fontSize:16,fontWeight:700,color:"#22c55e"}}>{formatBRL(jaRecebido)}</div></div>
                   <div style={{background:saldoDevedor>0?"#f59e0b12":"#22c55e12",border:`1px solid ${saldoDevedor>0?"#f59e0b33":"#22c55e33"}`,borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:11,color:"#64748b"}}>⏳ Saldo devedor</div><div style={{fontSize:16,fontWeight:700,color:saldoDevedor>0?"#f59e0b":"#22c55e"}}>{formatBRL(saldoDevedor)}</div></div>
                 </div>
                 {/* Histórico de pagamentos parciais */}
-                <div style={{background:"#0f0f1366",border:"1px solid #ffffff0a",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                <div style={{background:"#09090B66",border:"1px solid #18181D",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:payments.length>0?8:0}}>
                     <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>💵 Pagamentos recebidos</span>
                     <button onClick={()=>{
@@ -1303,7 +1314,7 @@ function AppContent({ onLogout, userEmail }) {
             </div>
 
             <div style={{display:"flex",gap:8,marginBottom:16}}>
-              {[{key:"equipe",label:"👥 Equipe & Cachês"},{key:"gastos",label:"💸 Despesas do Job"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#1e1e2e",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
+              {[{key:"equipe",label:"Equipe & Cachês"},{key:"gastos",label:"Despesas do Job"}].map(st=>(<button key={st.key} onClick={()=>{setJobSubTab(st.key);setShowAddFL(false);setShowAddExpense(false);}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,borderRadius:10,background:jobSubTab===st.key?currentJobColor:"#101014",color:jobSubTab===st.key?"#fff":"#64748b"}}>{st.label}</button>))}
             </div>
 
             {jobSubTab==="equipe"&&(
@@ -1314,9 +1325,9 @@ function AppContent({ onLogout, userEmail }) {
                     setFormCache(p=>({...p,workDates:[...currentJob.workDates],dateWork:currentJob.workDates[0]}));
                   }
                   return next;
-                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddFL?"#1e1e2e":currentJobColor+"22",border:`1px solid ${currentJobColor}44`,borderRadius:12,color:currentJobColor,fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddFL?"▲ Fechar":"＋ Adicionar profissional"}</button>
+                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddFL?"#101014":currentJobColor+"22",border:`1px solid ${currentJobColor}44`,borderRadius:10,color:currentJobColor,fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddFL?"▲ Fechar":"＋ Adicionar profissional"}</button>
                 {showAddFL&&(
-                  <div style={{background:"#1e1e2e",border:`1px solid ${currentJobColor}33`,borderRadius:14,padding:20,marginBottom:16}}>
+                  <div style={{background:"#101014",border:`1px solid ${currentJobColor}33`,borderRadius:10,padding:20,marginBottom:16}}>
                     {freelancers.length>0?(<>
                       <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:currentJobColor}}>Adicionar cachê</h3>
                       <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -1338,8 +1349,8 @@ function AppContent({ onLogout, userEmail }) {
                             {(!formCache.workDates||formCache.workDates.length===0)&&<span style={{fontSize:11,color:"#475569"}}>Nenhuma diária ainda.</span>}
                           </div>
                           <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
-                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>De</div><input type="date" id="cacheRangeStart" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
-                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Até</div><input type="date" id="cacheRangeEnd" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>De</div><input type="date" id="cacheRangeStart" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                            <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Até</div><input type="date" id="cacheRangeEnd" defaultValue={formCache.workDates?.[0]||today()} style={{background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
                             <button onClick={()=>{
                               const start=document.getElementById("cacheRangeStart").value;
                               const end=document.getElementById("cacheRangeEnd").value;
@@ -1374,7 +1385,7 @@ function AppContent({ onLogout, userEmail }) {
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {currentJobCaches.map(c=>{
                     const fl=freelancers.find(f=>f.id===c.freelancerId);const flIdx=freelancers.findIndex(f=>f.id===c.freelancerId);const cor=getColor(flIdx);const total=cacheTotal(c);
-                    return(<div key={c.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:14,padding:"14px 16px"}}>
+                    return(<div key={c.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,padding:"14px 16px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
                         <div style={{width:38,height:38,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:cor,flexShrink:0}}>{fl?(fl.apelido?fl.apelido.slice(0,3):fl.name[0]):"?"}</div>
                         <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{fl?.name||"\u2014"}{c.desc&&<span style={{color:"#64748b",fontWeight:400}}> \u2014 {c.desc}</span>}{(()=>{if(c.status==="pago")return null;const ref=c.dateDue||c.dateWork;if(!ref)return null;const age=Math.ceil((new Date(today())-new Date(ref))/(1000*60*60*24));if(age>30)return <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",borderRadius:5,padding:"2px 6px",marginLeft:6,fontWeight:700}}>h\u00e1 {age}d sem pagar</span>;return null;})()}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{c.role}{(c.workDates&&c.workDates.length>0)?` \u00b7 \ud83d\udcc5 ${c.workDates.length>1?`${c.workDates.length} di\u00e1rias (${c.workDates[0]} a ${c.workDates[c.workDates.length-1]})`:c.workDates[0]}`:(c.dateWork&&` \u00b7 \ud83d\udcc5 ${c.dateWork}`)}{c.dateDue&&` \u00b7 \u23f0 ${c.dateDue}`}{c.datePaid&&<span style={{color:"#22c55e"}}> \u00b7 \u2705 {c.datePaid}</span>}{c.paymentMethod&&c.status==="pago"&&<span style={{color:"#22c55e"}}> \u00b7 {c.paymentMethod}</span>}</div></div>
@@ -1384,7 +1395,7 @@ function AppContent({ onLogout, userEmail }) {
                         <button onClick={()=>removeCache(c.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                       </div>
                       <div style={{display:"flex",gap:8,paddingLeft:50}}>
-                        <div style={{background:"#a78bfa15",border:"1px solid #a78bfa33",borderRadius:8,padding:"5px 10px",flex:1}}><div style={{fontSize:10,color:"#a78bfa",marginBottom:2}}>💰 Cachê</div><div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{formatBRL(c.value)}</div></div>
+                        <div style={{background:"#4D7CFE15",border:"1px solid #4D7CFE33",borderRadius:8,padding:"5px 10px",flex:1}}><div style={{fontSize:10,color:"#4D7CFE",marginBottom:2}}>💰 Cachê</div><div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{formatBRL(c.value)}</div></div>
                         <div style={{background:"#34d39915",border:"1px solid #34d39933",borderRadius:8,padding:"5px 10px",flex:1}}><div style={{fontSize:10,color:"#34d399",marginBottom:2}}>🍽️ Alimentação</div><div style={{fontSize:13,fontWeight:700,color:c.alimentacao?"#e2e8f0":"#334155"}}>{formatBRL(c.alimentacao||0)}</div></div>
                         <div style={{background:"#22d3ee15",border:"1px solid #22d3ee33",borderRadius:8,padding:"5px 10px",flex:1}}><div style={{fontSize:10,color:"#22d3ee",marginBottom:2}}>🚗 Logística</div><div style={{fontSize:13,fontWeight:700,color:c.logistica?"#e2e8f0":"#334155"}}>{formatBRL(c.logistica||0)}</div></div>
                       </div>
@@ -1403,9 +1414,9 @@ function AppContent({ onLogout, userEmail }) {
                     setFormProjExp(p=>({...p,dateWork:jobDate}));
                   }
                   return next;
-                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddExpense?"#1e1e2e":"#f8717122",border:"1px solid #f8717144",borderRadius:12,color:"#f87171",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddExpense?"▲ Fechar":"＋ Adicionar despesa"}</button>
+                })} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddExpense?"#101014":"#f8717122",border:"1px solid #f8717144",borderRadius:10,color:"#f87171",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddExpense?"▲ Fechar":"＋ Adicionar despesa"}</button>
                 {showAddExpense&&(
-                  <div style={{background:"#1e1e2e",border:"1px solid #f8717133",borderRadius:14,padding:20,marginBottom:16}}>
+                  <div style={{background:"#101014",border:"1px solid #f8717133",borderRadius:10,padding:20,marginBottom:16}}>
                     <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#f87171"}}>Nova Despesa</h3>
                     <div style={{display:"flex",flexDirection:"column",gap:10}}>
                       <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Tipo de gasto</div>
@@ -1422,8 +1433,8 @@ function AppContent({ onLogout, userEmail }) {
                       </div>
                       <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Forma de pagamento</div>
                         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                          {["à vista","parcelado"].map(pt=>(<button key={pt} onClick={()=>setFormProjExp(p=>({...p,paymentType:pt}))} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formProjExp.paymentType===pt?"#a78bfa":"#a78bfa22",color:formProjExp.paymentType===pt?"#fff":"#a78bfa"}}>{pt==="à vista"?"💵 À vista":"📆 Parcelado"}</button>))}
-                          {formProjExp.paymentType==="parcelado"&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:12,color:"#64748b"}}>Parcelas:</span><select value={formProjExp.parcelas} onChange={e=>setFormProjExp(p=>({...p,parcelas:e.target.value}))} style={{background:"#0f0f13",border:"1px solid #ffffff20",borderRadius:6,padding:"4px 8px",color:"#e2e8f0",fontSize:12}}>{["2","3","4","5","6","7","8","9","10","11","12"].map(n=><option key={n}>{n}x</option>)}</select></div>}
+                          {["à vista","parcelado"].map(pt=>(<button key={pt} onClick={()=>setFormProjExp(p=>({...p,paymentType:pt}))} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formProjExp.paymentType===pt?"#4D7CFE":"#4D7CFE22",color:formProjExp.paymentType===pt?"#fff":"#4D7CFE"}}>{pt==="à vista"?"💵 À vista":"📆 Parcelado"}</button>))}
+                          {formProjExp.paymentType==="parcelado"&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:12,color:"#64748b"}}>Parcelas:</span><select value={formProjExp.parcelas} onChange={e=>setFormProjExp(p=>({...p,parcelas:e.target.value}))} style={{background:"#09090B",border:"1px solid #ffffff20",borderRadius:6,padding:"4px 8px",color:"#e2e8f0",fontSize:12}}>{["2","3","4","5","6","7","8","9","10","11","12"].map(n=><option key={n}>{n}x</option>)}</select></div>}
                         </div>
                       </div>
                       <Select label="Status" value={formProjExp.status} onChange={v=>setFormProjExp(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
@@ -1437,9 +1448,9 @@ function AppContent({ onLogout, userEmail }) {
                   return(<div key={source} style={{marginBottom:20}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:13,fontWeight:700,color:cor}}>💳 {source}</span><span style={{fontSize:13,fontWeight:700,color:"#fff"}}>{formatBRL(total)}</span></div>
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {items.map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+                      {items.map(item=>(<div key={item.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
                         <span style={{fontSize:18}}>{TYPE_ICON[item.type]||"📦"}</span>
-                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#a78bfa",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
+                        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#4D7CFE",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
                         <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
                         <button onClick={()=>toggleStatus(projectExpenses,setProjectExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
                         <button onClick={()=>startEdit("projexp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
@@ -1457,12 +1468,12 @@ function AppContent({ onLogout, userEmail }) {
         {/* ── PROFISSIONAIS ── */}
         {tab==="profissionais"&&(
           <div>
-            <FormCard title="Cadastrar novo profissional" color="#a78bfa">
+            <FormCard title="Cadastrar novo profissional" color="#4D7CFE">
               <Row><Input label="Nome completo" value={formFL.name} onChange={v=>setFormFL(p=>({...p,name:v}))}/><Input label="Apelido" value={formFL.apelido} onChange={v=>setFormFL(p=>({...p,apelido:v}))}/></Row>
               <Row><Input label="WhatsApp" value={formFL.phone} onChange={v=>setFormFL(p=>({...p,phone:v}))}/><Input label="E-mail" value={formFL.email} onChange={v=>setFormFL(p=>({...p,email:v}))}/></Row>
               <Row><Select label="Função" value={formFL.role} onChange={v=>setFormFL(p=>({...p,role:v}))} options={ROLES}/><Input label="Nascimento" value={formFL.nasc} onChange={v=>setFormFL(p=>({...p,nasc:v}))}/></Row>
               <Row><Input label="CPF" value={formFL.cpf} onChange={v=>setFormFL(p=>({...p,cpf:v}))}/><Input label="RG" value={formFL.rg} onChange={v=>setFormFL(p=>({...p,rg:v}))}/></Row>
-              <AddBtn onClick={()=>{if(!formFL.name)return;setFreelancers(p=>[...p,{...formFL,id:Date.now()}]);setFormFL(emptyFL);}} color="#a78bfa">+ Cadastrar</AddBtn>
+              <AddBtn onClick={()=>{if(!formFL.name)return;setFreelancers(p=>[...p,{...formFL,id:Date.now()}]);setFormFL(emptyFL);}} color="#4D7CFE">+ Cadastrar</AddBtn>
             </FormCard>
             {freelancers.length===0&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhum profissional cadastrado ainda.</div>}
             {freelancers.length>0&&(
@@ -1477,7 +1488,7 @@ function AppContent({ onLogout, userEmail }) {
                     const idx=freelancers.findIndex(f=>f.id===fl.id);
                     const fc=caches.filter(c=>c.freelancerId===fl.id);const total=fc.reduce((s,c)=>s+cacheTotal(c),0);const cor=getColor(idx);
                     const isExpanded = expandedFLId===fl.id;
-                    return(<div key={fl.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,overflow:"hidden"}}>
+                    return(<div key={fl.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,overflow:"hidden"}}>
                       <div onClick={()=>fc.length>0&&setExpandedFLId(p=>p===fl.id?null:fl.id)} style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:fc.length>0?"pointer":"default"}}>
                         <div style={{width:40,height:40,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:cor,flexShrink:0}}>{fl.apelido?fl.apelido.slice(0,3):fl.name[0]}</div>
                         <div style={{flex:1}}>
@@ -1499,7 +1510,7 @@ function AppContent({ onLogout, userEmail }) {
                             const job=jobs.find(j=>j.id===c.jobId);
                             const client=job?clients.find(cl=>cl.id===job.clientId):null;
                             const cTotal=cacheTotal(c);
-                            return(<div key={c.id} style={{background:"#0f0f13",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                            return(<div key={c.id} style={{background:"#09090B",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                               <div style={{width:6,height:6,borderRadius:"50%",background:cor,flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <span style={{color:"#e2e8f0",fontWeight:500}}>{job?.desc||"—"}</span>
@@ -1547,7 +1558,7 @@ function AppContent({ onLogout, userEmail }) {
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:13,fontWeight:700,color:cor}}>{pessoa}</span><span style={{fontSize:12,color:"#475569"}}>—</span><span style={{fontSize:13,fontWeight:600,color:"#fff"}}>{formatBRL(total)}</span></div>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {items.map(item=>(
-                    <div key={item.id} style={{background:"#1e1e2e",border:`1px solid ${cor}22`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+                    <div key={item.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
                         <div style={{fontSize:11,color:"#64748b",marginTop:2,display:"flex",gap:8}}>
@@ -1576,7 +1587,7 @@ function AppContent({ onLogout, userEmail }) {
               <Row><Input label="💰 Data pagamento" type="date" value={formE.datePay} onChange={v=>setFormE(p=>({...p,datePay:v}))}/><Select label="Categoria" value={formE.category} onChange={v=>setFormE(p=>({...p,category:v}))} options={CATEGORIES_EXPENSE}/></Row>
               <Row>
                 <Select label="Natureza" value={formE.natureza||"overhead"} onChange={v=>setFormE(p=>({...p,natureza:v,jobId:v==="overhead"?"":p.jobId}))} options={["overhead","vinculado a job"]}/>
-                {(formE.natureza==="vinculado a job")&&<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job</div><select value={formE.jobId||""} onChange={e=>setFormE(p=>({...p,jobId:Number(e.target.value)}))} style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="">Selecione...</option>{jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}</select></div>}
+                {(formE.natureza==="vinculado a job")&&<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job</div><select value={formE.jobId||""} onChange={e=>setFormE(p=>({...p,jobId:Number(e.target.value)}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="">Selecione...</option>{jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}</select></div>}
               </Row>
               <Select label="Status" value={formE.status} onChange={v=>setFormE(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
               <AddBtn onClick={addExpense}>+ Adicionar</AddBtn>
@@ -1584,8 +1595,8 @@ function AppContent({ onLogout, userEmail }) {
             <SummaryPill label={`Total — ${formatBRL(totals.paidExpenses)} pagos`} value={totals.totalExpenses} color="#f87171"/>
             {expenses.length===0&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhum gasto lançado ainda.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {[...expenses].reverse().map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:"1px solid #ffffff0a",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.dateWork&&` · 📅 ${item.dateWork}`}{item.datePay&&` · 💰 ${item.datePay}`}{item.jobId&&<span style={{color:"#a78bfa"}}> · {jobs.find(j=>j.id===item.jobId)?.desc||""}</span>}</div></div>
+              {[...expenses].reverse().map(item=>(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.dateWork&&` · 📅 ${item.dateWork}`}{item.datePay&&` · 💰 ${item.datePay}`}{item.jobId&&<span style={{color:"#4D7CFE"}}> · {jobs.find(j=>j.id===item.jobId)?.desc||""}</span>}</div></div>
                 <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
                 <button onClick={()=>toggleStatus(expenses,setExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
                 <button onClick={()=>startEdit("exp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
@@ -1599,7 +1610,7 @@ function AppContent({ onLogout, userEmail }) {
         {tab==="studio"&&(
           <div>
             <p style={{fontSize:13,color:"#64748b",margin:"0 0 16px"}}>Despesas fixas do estúdio: aluguel, internet, energia, água, condomínio...</p>
-            <button onClick={()=>setShowAddStudio(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddStudio?"#1e1e2e":"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:12,color:"#22d3ee",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddStudio?"▲ Fechar":"＋ Adicionar despesa fixa"}</button>
+            <button onClick={()=>setShowAddStudio(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddStudio?"#101014":"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:10,color:"#22d3ee",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddStudio?"▲ Fechar":"＋ Adicionar despesa fixa"}</button>
             {showAddStudio&&(
               <FormCard title="Nova Despesa do Estúdio" color="#22d3ee">
                 <Input label="Descrição (ex: Aluguel da sala)" value={formStudio.desc} onChange={v=>setFormStudio(p=>({...p,desc:v}))}/>
@@ -1611,7 +1622,7 @@ function AppContent({ onLogout, userEmail }) {
             {studioExpenses.length>0&&<SummaryPill label="Total fixo mensal do estúdio" value={studioExpenses.filter(e=>e.active!==false).reduce((s,e)=>s+Number(e.value),0)} color="#22d3ee"/>}
             {studioExpenses.length===0&&!showAddStudio&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhuma despesa fixa cadastrada ainda.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {studioExpenses.map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:"1px solid #ffffff0a",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,opacity:item.active===false?0.5:1}}>
+              {studioExpenses.map(item=>(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,opacity:item.active===false?0.5:1}}>
                 <span style={{fontSize:18}}>🏢</span>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
@@ -1630,7 +1641,7 @@ function AppContent({ onLogout, userEmail }) {
         {tab==="subscriptions"&&(
           <div>
             <p style={{fontSize:13,color:"#64748b",margin:"0 0 16px"}}>Assinaturas e ferramentas: Figma, Claude, Adobe, softwares em geral...</p>
-            <button onClick={()=>setShowAddSub(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddSub?"#1e1e2e":"#facc1522",border:"1px solid #facc1544",borderRadius:12,color:"#facc15",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddSub?"▲ Fechar":"＋ Adicionar assinatura"}</button>
+            <button onClick={()=>setShowAddSub(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddSub?"#101014":"#facc1522",border:"1px solid #facc1544",borderRadius:10,color:"#facc15",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddSub?"▲ Fechar":"＋ Adicionar assinatura"}</button>
             {showAddSub&&(
               <FormCard title="Nova Assinatura" color="#facc15">
                 <Input label="Nome (ex: Figma, Claude Pro)" value={formSub.desc} onChange={v=>setFormSub(p=>({...p,desc:v}))}/>
@@ -1646,7 +1657,7 @@ function AppContent({ onLogout, userEmail }) {
             })()}
             {subscriptions.length===0&&!showAddSub&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhuma assinatura cadastrada ainda.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {subscriptions.map(item=>(<div key={item.id} style={{background:"#1e1e2e",border:"1px solid #ffffff0a",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,opacity:item.active===false?0.5:1}}>
+              {subscriptions.map(item=>(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,opacity:item.active===false?0.5:1}}>
                 <span style={{fontSize:18}}>🔁</span>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
@@ -1719,36 +1730,37 @@ function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"#1e1e2e",border:"1px solid #ffffff12",borderRadius:16,padding:32,width:"100%",maxWidth:360}}>
-        <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{fontSize:36,marginBottom:8}}>🎥</div>
-          <h1 style={{margin:0,fontSize:18,fontWeight:700,color:"#fff"}}>FramesBR <span style={{color:"#a78bfa"}}>Financial System</span></h1>
-          <p style={{margin:"6px 0 0",fontSize:12,color:"#64748b"}}>{mode==="login"?"Faça login para continuar":"Crie sua conta gratuita"}</p>
+    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');`}</style>
+      <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:36,width:"100%",maxWidth:380}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <h1 style={{margin:0,fontSize:24,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
+          <p style={{margin:"6px 0 0",fontSize:10,color:"#52525B",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"3px",textTransform:"uppercase"}}>Financial System</p>
+          <p style={{margin:"14px 0 0",fontSize:12,color:"#71717A"}}>{mode==="login"?"Faça login para continuar":"Crie sua conta gratuita"}</p>
         </div>
-        <div style={{display:"flex",gap:4,background:"#0f0f13",borderRadius:8,padding:4,marginBottom:20}}>
-          <button type="button" onClick={()=>{setMode("login");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="login"?"#a78bfa":"transparent",color:mode==="login"?"#fff":"#64748b"}}>Entrar</button>
-          <button type="button" onClick={()=>{setMode("signup");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="signup"?"#a78bfa":"transparent",color:mode==="signup"?"#fff":"#64748b"}}>Criar conta</button>
+        <div style={{display:"flex",gap:4,background:"#09090B",borderRadius:8,padding:4,marginBottom:20}}>
+          <button type="button" onClick={()=>{setMode("login");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="login"?"#4D7CFE":"transparent",color:mode==="login"?"#fff":"#64748b"}}>Entrar</button>
+          <button type="button" onClick={()=>{setMode("signup");setError("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:mode==="signup"?"#4D7CFE":"transparent",color:mode==="signup"?"#fff":"#64748b"}}>Criar conta</button>
         </div>
         {error && <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#fca5a5"}}>{error}</div>}
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>E-mail</div>
           <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"
-            style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         <div style={{marginBottom:mode==="signup"?12:20}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Senha</div>
           <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" minLength={mode==="signup"?6:undefined}
-            style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         {mode==="signup" && (
           <div style={{marginBottom:20}}>
             <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Confirmar senha</div>
             <input type="password" required value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="••••••••"
-              style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
           </div>
         )}
-        <button type="submit" disabled={loading} style={{width:"100%",background:"#a78bfa",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
+        <button type="submit" disabled={loading} style={{width:"100%",background:"#4D7CFE",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
           {loading?(mode==="login"?"Entrando...":"Criando conta..."):(mode==="login"?"Entrar":"Criar conta")}
         </button>
         {mode==="signup" && <p style={{margin:"14px 0 0",fontSize:11,color:"#475569",textAlign:"center"}}>Sua conta começa com dados em branco, separados de qualquer outra conta.</p>}
@@ -1771,8 +1783,8 @@ export default function App() {
 
   if (user === undefined) {
     return (
-      <div style={{fontFamily:"'Inter',sans-serif",background:"#0f0f13",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b"}}>
-        <div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🎥</div><div>Verificando login...</div></div>
+      <div style={{fontFamily:"'Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b"}}>
+        <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",letterSpacing:"-0.5px",marginBottom:10}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</div><div style={{fontSize:12,color:"#52525B"}}>Verificando login…</div></div>
       </div>
     );
   }
@@ -1788,17 +1800,17 @@ export default function App() {
 
 
 
-function EditModal({fields,editData,setEditData,onSave,onCancel,color="#a78bfa"}){
+function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE"}){
   return(
     <div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:"#1e1e2e",border:`1px solid ${color}44`,borderRadius:16,padding:24,width:"100%",maxWidth:460,maxHeight:"85vh",overflowY:"auto"}}>
+      <div style={{background:"#101014",border:`1px solid ${color}44`,borderRadius:12,padding:24,width:"100%",maxWidth:460,maxHeight:"85vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 16px",fontSize:15,fontWeight:700,color}}>✏️ Editar</h3>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {fields.map(f=>(f.type==="select"
             ?<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <select value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
+              <select value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
             :<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
           ))}
         </div>
         <div style={{display:"flex",gap:8,marginTop:16}}>
@@ -1810,8 +1822,8 @@ function EditModal({fields,editData,setEditData,onSave,onCancel,color="#a78bfa"}
   );
 }
 function SummaryPill({label,value,color}){return(<div style={{background:color+"15",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:12,color:"#94a3b8"}}>{label}</span><span style={{fontSize:16,fontWeight:700,color}}>{Number(value).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>);}
-function FormCard({title,color,children}){return(<div style={{background:"#1e1e2e",border:`1px solid ${color}22`,borderRadius:14,padding:20,marginBottom:20}}><h3 style={{margin:"0 0 16px",fontSize:14,fontWeight:600,color}}>{title}</h3><div style={{display:"flex",flexDirection:"column",gap:10}}>{children}</div></div>);}
+function FormCard({title,color,children}){return(<div style={{background:"#101014",border:`1px solid ${color}22`,borderRadius:10,padding:20,marginBottom:20}}><h3 style={{margin:"0 0 16px",fontSize:14,fontWeight:600,color}}>{title}</h3><div style={{display:"flex",flexDirection:"column",gap:10}}>{children}</div></div>);}
 function Row({children}){return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{children}</div>;}
-function Input({label,value,onChange,type="text"}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>);}
-function Select({label,value,onChange,options}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#0f0f13",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{options.map(o=><option key={String(o)} value={o}>{o}</option>)}</select></div>);}
+function Input({label,value,onChange,type="text"}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>);}
+function Select({label,value,onChange,options}){return(<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{label}</div><select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{options.map(o=><option key={String(o)} value={o}>{o}</option>)}</select></div>);}
 function AddBtn({onClick,color="#f87171",children}){return(<button onClick={onClick} style={{background:color,color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",marginTop:4}}>{children}</button>);}
