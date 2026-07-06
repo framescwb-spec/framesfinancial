@@ -796,8 +796,15 @@ function AppContent({ onLogout, userEmail }) {
         .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
         button { transition: opacity .15s, background .15s, border-color .15s; }
         button:hover { opacity: .88; }
-        input:focus, select:focus { border-color: #4D7CFE66 !important; }
+        input:focus, select:focus { border-color: #4D7CFE66 !important; box-shadow: 0 0 0 3px #4D7CFE15; }
+        /* ── Premium touches (Suno/Artlist-inspired) ── */
+        .glow-top { position: fixed; top: -240px; left: 50%; transform: translateX(-50%); width: 720px; height: 480px; background: radial-gradient(ellipse at center, #4D7CFE14 0%, transparent 65%); pointer-events: none; z-index: 0; }
+        .premium-card { position: relative; background: linear-gradient(180deg, #101016 0%, #0C0C10 100%) !important; }
+        .premium-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #4D7CFE33, transparent 40%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+        .btn-primary { background: linear-gradient(135deg, #5B8AFF 0%, #3D6BEE 100%) !important; box-shadow: 0 4px 20px #4D7CFE33, inset 0 1px 0 #ffffff22 !important; }
+        .btn-primary:hover { box-shadow: 0 6px 28px #4D7CFE55, inset 0 1px 0 #ffffff22 !important; opacity: 1 !important; }
       `}</style>
+      <div className="glow-top"/>
       {editingId&&editingId.startsWith("client:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{setClients(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome do cliente"}]}/>}
       {editingId&&editingId.startsWith("job:")&&<EditModal editData={editData} setEditData={setEditData} color="#34d399" onSave={()=>{
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
@@ -889,7 +896,7 @@ function AppContent({ onLogout, userEmail }) {
             {dashSubTab==="geral"&&(<>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
                 {[{label:"Saldo Atual",value:totals.balance,color:totals.balance>=0?"#22c55e":"#ef4444",sub:"recebido − gastos − cachês pagos − reembolsos pagos"},{label:"Projetado Líquido",value:totals.projected,color:"#4D7CFE",sub:`após NF (${formatBRL(totals.totalNF)}) − todos os custos`},{label:"Clientes (total bruto)",value:totals.totalReceivables,color:"#34d399",sub:`${formatBRL(totals.received)} já recebido`},{label:"Gastos nos projetos",value:totals.totalProjExp+totals.totalCaches,color:"#f87171",sub:`${formatBRL(totals.cachesAPagar)} cachês a pagar`},{label:"Custo fixo mensal",value:totals.totalFixedMonthly,color:"#22d3ee",sub:`${formatBRL(totals.studioFixedMonthly)} estúdio · ${formatBRL(totals.subsFixedMonthly)} assinaturas`}].map(c=>(
-                  <div key={c.label} style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:"18px 20px"}}>
+                  <div key={c.label} className="premium-card" style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:"18px 20px"}}>
                     <div className="mono" style={{fontSize:10,color:"#52525B",marginBottom:6,letterSpacing:"1.5px",textTransform:"uppercase"}}>{c.label}</div>
                     <div className="mono" style={{fontSize:22,fontWeight:600,color:c.color}}>{formatBRL(c.value)}</div>
                     <div style={{fontSize:11,color:"#3F3F46",marginTop:5}}>{c.sub}</div>
@@ -1730,9 +1737,10 @@ function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',sans-serif",background:"#09090B",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');`}</style>
-      <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:36,width:"100%",maxWidth:380}}>
+      <div style={{position:"absolute",top:"-30%",left:"50%",transform:"translateX(-50%)",width:700,height:600,background:"radial-gradient(ellipse at center, #4D7CFE1A 0%, transparent 62%)",pointerEvents:"none"}}/>
+      <form onSubmit={mode==="login"?handleLogin:handleSignup} style={{background:"linear-gradient(180deg,#101016 0%,#0C0C10 100%)",border:"1px solid #232330",borderRadius:12,padding:36,width:"100%",maxWidth:380,position:"relative",boxShadow:"0 24px 80px #00000066, 0 0 60px #4D7CFE0D"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <h1 style={{margin:0,fontSize:24,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
           <p style={{margin:"6px 0 0",fontSize:10,color:"#52525B",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"3px",textTransform:"uppercase"}}>Financial System</p>
@@ -1760,7 +1768,7 @@ function LoginScreen({ onLoginSuccess }) {
               style={{width:"100%",background:"#09090B",border:"1px solid #ffffff15",borderRadius:8,padding:"10px 12px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
           </div>
         )}
-        <button type="submit" disabled={loading} style={{width:"100%",background:"#4D7CFE",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
+        <button type="submit" disabled={loading} style={{width:"100%",background:"linear-gradient(135deg,#5B8AFF 0%,#3D6BEE 100%)",boxShadow:"0 4px 20px #4D7CFE33, inset 0 1px 0 #ffffff22",color:"#fff",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:600,cursor:loading?"default":"pointer",opacity:loading?0.6:1}}>
           {loading?(mode==="login"?"Entrando...":"Criando conta..."):(mode==="login"?"Entrar":"Criar conta")}
         </button>
         {mode==="signup" && <p style={{margin:"14px 0 0",fontSize:11,color:"#475569",textAlign:"center"}}>Sua conta começa com dados em branco, separados de qualquer outra conta.</p>}
