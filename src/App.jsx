@@ -230,15 +230,16 @@ async function loadFromStorage(defaults) {
       lastSavedHash = hashData(saved);
       return {
         expenses: saved.expenses ?? [],
-        clients: saved.clients ?? defaults.clients,
-        jobs: saved.jobs ?? defaults.jobs,
-        reimbursements: saved.reimbursements ?? defaults.reimbursements,
-        freelancers: saved.freelancers ?? defaults.freelancers,
-        caches: saved.caches ?? defaults.caches,
-        projectExpenses: saved.projectExpenses ?? defaults.projectExpenses,
+        clients: saved.clients ?? [],
+        jobs: saved.jobs ?? [],
+        reimbursements: saved.reimbursements ?? [],
+        freelancers: saved.freelancers ?? [],
+        caches: saved.caches ?? [],
+        projectExpenses: saved.projectExpenses ?? [],
         studioExpenses: saved.studioExpenses ?? [],
         subscriptions: saved.subscriptions ?? [],
         accommodations: saved.accommodations ?? [],
+        _isExistingDoc: true,
       };
     }
   } catch(e) { console.error("Erro ao carregar do Firebase:", e); if(onStorageError) onStorageError(`Erro ao CARREGAR: ${e.code||e.message||e}`); }
@@ -252,11 +253,18 @@ async function loadFromStorage(defaults) {
       const migrated = migrateOldData(old, defaults);
       await saveToStorage(migrated);
       window.localStorage.removeItem("framesbr-legacy-import");
-      return migrated;
+      return {...migrated, _isExistingDoc: true};
     }
   } catch(e) { console.error("Erro na migração de dados antigos:", e); }
 
-  return { ...defaults, studioExpenses: [], subscriptions: [] };
+  // Conta nova (documento ainda não existe no Firestore): começa TUDO vazio,
+  // sem os dados de exemplo do código. Cada nova produtora monta seu sistema do zero.
+  return {
+    expenses: [], clients: [], jobs: [], reimbursements: [],
+    freelancers: [], caches: [], projectExpenses: [],
+    studioExpenses: [], subscriptions: [], accommodations: [],
+    _isNewAccount: true,
+  };
 }
 
 async function saveToStorage(data) {
@@ -303,43 +311,39 @@ function AppContent({ onLogout, userEmail }) {
   const [editData, setEditData] = useState({});
 
   const [expenses, setExpenses] = useState([]);
-  const [clients, setClients] = useState(DEFAULT_CLIENTS);
-  const [jobs, setJobs] = useState(DEFAULT_JOBS);
-  const [reimbursements, setReimbursements] = useState(DEFAULT_REIMBURSEMENTS);
-  const [freelancers, setFreelancers] = useState(DEFAULT_FREELANCERS);
-  const [caches, setCaches] = useState(DEFAULT_CACHES);
-  const [projectExpenses, setProjectExpenses] = useState(DEFAULT_PROJ_EXPENSES);
-  const [studioExpenses, setStudioExpenses] = useState(DEFAULT_STUDIO_EXPENSES);
-  const [subscriptions, setSubscriptions] = useState(DEFAULT_SUBSCRIPTIONS);
+  const [clients, setClients] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [reimbursements, setReimbursements] = useState([]);
+  const [freelancers, setFreelancers] = useState([]);
+  const [caches, setCaches] = useState([]);
+  const [projectExpenses, setProjectExpenses] = useState([]);
+  const [studioExpenses, setStudioExpenses] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
 
   const applyLoadedData = (data) => {
+    // Conta nova: aplica exatamente o que veio (tudo vazio), sem misturar com
+    // os dados de exemplo do código nem rodar correções de dados legados.
+    if (data._isNewAccount) {
+      setExpenses([]); setClients([]); setJobs([]); setReimbursements([]);
+      setFreelancers([]); setCaches([]); setProjectExpenses([]);
+      setStudioExpenses([]); setSubscriptions([]);
+      return;
+    }
+
     setExpenses(data.expenses);
 
-    const savedClientIds = new Set(data.clients.map(c => c.id));
-    let mergedClients = [...data.clients, ...DEFAULT_CLIENTS.filter(c => !savedClientIds.has(c.id))];
-    const savedJobIds = new Set(data.jobs.map(j => j.id));
-    let mergedJobs = [...data.jobs, ...DEFAULT_JOBS.filter(j => !savedJobIds.has(j.id))];
-
-    // Fix duplicate "Cruzeiro do Sul": an earlier auto-fix may have already renamed client id 7
-    // (originally "RIO2C") to "Cruzeiro do Sul", creating a duplicate alongside the user's
-    // original client. Detect ANY duplicate "Cruzeiro do Sul" entries and merge them into one,
-    // keeping the lowest id as canonical and moving jobs from the others over to it.
+    // Correções pontuais de dados legados da conta original (Cruzeiro do Sul / GINGA→CWB).
+    // Só rodam se esses registros específicos existirem nos dados salvos — em qualquer
+    // outra conta simplesmente não fazem nada. NÃO injetam dados de exemplo.
+    let mergedClients = [...data.clients];
+    let mergedJobs = [...data.jobs];
     const cruzeiroDupes = mergedClients.filter(c => c.name === "Cruzeiro do Sul");
     if (cruzeiroDupes.length > 1) {
       const canonical = cruzeiroDupes.reduce((a,b) => a.id < b.id ? a : b);
       const dupeIds = cruzeiroDupes.filter(c => c.id !== canonical.id).map(c => c.id);
       mergedJobs = mergedJobs.map(j => dupeIds.includes(j.clientId) ? {...j, clientId: canonical.id} : j);
       mergedClients = mergedClients.filter(c => !dupeIds.includes(c.id));
-    } else {
-      // No duplicate yet — fall back to the original rename-if-needed logic.
-      const rio2cClient = mergedClients.find(c => c.id === 7 && c.name === "RIO2C");
-      if (rio2cClient) {
-        mergedClients = mergedClients.map(c => c.id === 7 ? {...c, name: "Cruzeiro do Sul"} : c);
-      }
     }
-    // Move job "GINGA" (id 106) from the old standalone "GINGA" client (id 6) into the
-    // new "CWB Brasil" client (id 9), without losing any edits already saved on the job
-    // (value, valorRecebido, status, dates, etc. are preserved — only clientId changes).
     const cwbClient = mergedClients.find(c => c.name === "CWB Brasil");
     if (cwbClient) {
       mergedJobs = mergedJobs.map(j => (j.id === 106 || (j.desc === "GINGA" && j.clientId === 6)) ? {...j, clientId: cwbClient.id} : j);
@@ -347,9 +351,7 @@ function AppContent({ onLogout, userEmail }) {
 
     setClients(mergedClients);
 
-    // ── Date model migration ──
-    // Jobs: old `datePay` becomes `dateDueExpected` (previsão de recebimento).
-    // Old binary statuses map to the new stage system.
+    // ── Migração de estrutura de campos (segura para todas as contas) ──
     mergedJobs = mergedJobs.map(j => {
       const m = {...j};
       if (m.datePay !== undefined && m.dateDueExpected === undefined) {
@@ -369,12 +371,9 @@ function AppContent({ onLogout, userEmail }) {
 
     setReimbursements(data.reimbursements);
 
-    const savedFLIds = new Set(data.freelancers.map(f => f.id));
-    setFreelancers([...data.freelancers, ...DEFAULT_FREELANCERS.filter(f => !savedFLIds.has(f.id))]);
+    setFreelancers([...data.freelancers]);
 
-    const savedCacheIds = new Set(data.caches.map(c => c.id));
-    let mergedCaches = [...data.caches, ...DEFAULT_CACHES.filter(c => !savedCacheIds.has(c.id))];
-    // Caches: old `datePay` becomes `dateDue` (quando combinou de pagar).
+    let mergedCaches = [...data.caches];
     mergedCaches = mergedCaches.map(c => {
       const m = {...c};
       if (m.datePay !== undefined && m.dateDue === undefined) {
@@ -387,8 +386,7 @@ function AppContent({ onLogout, userEmail }) {
     });
     setCaches(mergedCaches);
 
-    const savedProjExpIds = new Set(data.projectExpenses.map(e => e.id));
-    let mergedProjExp = [...data.projectExpenses, ...DEFAULT_PROJ_EXPENSES.filter(e => !savedProjExpIds.has(e.id))].map(e => e.dateFim === undefined ? {...e, dateFim: ""} : e);
+    let mergedProjExp = [...data.projectExpenses].map(e => e.dateFim === undefined ? {...e, dateFim: ""} : e);
     // Migração: a antiga aba separada "Hotel/Airbnb" (accommodations) foi unificada
     // dentro de "Despesas do Job" como um tipo de despesa. Qualquer hospedagem
     // salva no formato antigo vira uma despesa comum, sem perder nenhum dado.
