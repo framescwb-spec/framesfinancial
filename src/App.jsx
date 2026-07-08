@@ -30,9 +30,9 @@ function getDocRef() {
 }
 
 const ROLES = ["Diretor","Cinegrafista","Editor","Motion","Fotógrafo","Produtor","Assistente","Drone","Áudio","Outro"];
-const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Hotel/Airbnb","Gasolina","Gastos extras","Outro"];
+const EXPENSE_TYPES = ["Logística","Alimentação","Uber","Voo","Hotel/Airbnb","Estacionamento","Gasolina","Gastos extras","Outro"];
 const PAYMENT_SOURCES = ["Cartão Frames","Cartão Japa","Cartão Ivan","Dinheiro","Pix/Transferência"];
-const CATEGORIES_EXPENSE = ["Equipamento","Software","Marketing","Pessoal","Aluguel","Transporte","Outros"];
+const CATEGORIES_EXPENSE = ["Equipamento","Software","Marketing","Pessoal","Aluguel","Transporte","Estacionamento","Outros"];
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const REIMB_SOURCES = ["Frames","Ivan","Japa"];
 
@@ -41,7 +41,7 @@ const today = () => new Date().toISOString().split("T")[0];
 const AVATAR_COLORS = ["#818cf8","#fb923c","#f472b6","#34d399","#22d3ee","#facc15","#4D7CFE","#f87171","#4ade80","#38bdf8"];
 const getColor = (idx) => AVATAR_COLORS[Math.abs(idx) % AVATAR_COLORS.length];
 const SOURCE_COLOR = {"Cartão Frames":"#facc15","Cartão Japa":"#22d3ee","Cartão Ivan":"#f472b6","Dinheiro":"#34d399","Pix/Transferência":"#818cf8"};
-const TYPE_ICON = {"Logística":"🚛","Alimentação":"🍽️","Uber":"🚗","Voo":"✈️","Hotel/Airbnb":"🏨","Gasolina":"⛽","Gastos extras":"💳","Outro":"📦"};
+const TYPE_ICON = {"Logística":"🚛","Alimentação":"🍽️","Uber":"🚗","Voo":"✈️","Hotel/Airbnb":"🏨","Estacionamento":"🅿️","Gasolina":"⛽","Gastos extras":"💳","Outro":"📦"};
 const monthKey = (d) => d ? d.slice(0,7) : null;
 const monthLabel = (key) => { if(!key) return "—"; const [y,m]=key.split("-"); return `${MONTHS_PT[parseInt(m)-1]}/${y}`; };
 
@@ -330,7 +330,13 @@ function AppContent({ onLogout, userEmail }) {
       return;
     }
 
-    setExpenses(data.expenses);
+    setExpenses((data.expenses||[]).map(e => ({
+      source: e.source ?? PAYMENT_SOURCES[0],
+      paymentType: e.paymentType ?? "à vista",
+      parcelas: e.parcelas ?? "1",
+      parcelasPagas: e.parcelasPagas ?? (e.status==="pago" ? (e.parcelas ?? "1") : "0"),
+      ...e,
+    })));
 
     // Correções pontuais de dados legados da conta original (Cruzeiro do Sul / GINGA→CWB).
     // Só rodam se esses registros específicos existirem nos dados salvos — em qualquer
@@ -560,7 +566,7 @@ function AppContent({ onLogout, userEmail }) {
     };
   }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
 
-  const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",dateWork:today(),datePay:"",status:"a pagar"};
+  const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"1",parcelasPagas:"0",dateWork:today(),datePay:"",status:"a pagar"};
   const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true};
   const emptySub = {desc:"",value:"",category:SUB_CATEGORIES[0],cycle:"mensal",dayOfMonth:"1",dateStart:today(),active:true};
   const emptyClient = {name:""};
@@ -693,7 +699,8 @@ function AppContent({ onLogout, userEmail }) {
     return results.slice(0,8);
   },[searchQuery,clients,jobs,freelancers]);
 
-  const addExpense=()=>{if(!formE.desc||!formE.value)return;setExpenses(p=>[...p,{...formE,id:Date.now(),value:Number(formE.value)}]);logChange(`Gasto: ${formE.desc}`);setFormE(emptyE);};
+  const addExpense=()=>{if(!formE.desc||!formE.value)return;const parcelas=formE.paymentType==="parcelado"?formE.parcelas:"1";const parcelasPagas=formE.paymentType==="parcelado"?formE.parcelasPagas:(formE.status==="pago"?"1":"0");setExpenses(p=>[...p,{...formE,id:Date.now(),value:Number(formE.value),parcelas,parcelasPagas,status:formE.paymentType==="parcelado"?(Number(parcelasPagas)>=Number(parcelas)?"pago":"a pagar"):formE.status}]);logChange(`Gasto: ${formE.desc}`);setFormE(emptyE);};
+  const duplicateExpense=(item)=>{setExpenses(p=>[...p,{...item,id:Date.now(),desc:`${item.desc} (cópia)`}]);logChange(`Gasto duplicado: ${item.desc}`);};
   const addClient=()=>{if(!formClient.name)return;setClients(p=>[...p,{...formClient,id:Date.now()}]);logChange(`Cliente adicionado: ${formClient.name}`);setFormClient(emptyClient);setShowAddClient(false);};
   const removeClient=(id)=>{
     const cl=clients.find(c=>c.id===id);
@@ -739,6 +746,8 @@ function AppContent({ onLogout, userEmail }) {
   const removeCache=(id)=>{const c=caches.find(x=>x.id===id);const fl=freelancers.find(f=>f.id===c?.freelancerId);if(!confirmDelete(`Remover cachê de ${fl?.apelido||fl?.name}?`))return;setCaches(p=>p.filter(c=>c.id!==id));logChange(`Cache removido: ${fl?.apelido||fl?.name}`);};
   const removeFreelancer=(id)=>{const fl=freelancers.find(f=>f.id===id);if(!confirmDelete(`Remover profissional "${fl?.name}"?`))return;setFreelancers(p=>p.filter(f=>f.id!==id));setCaches(p=>p.filter(c=>c.freelancerId!==id));logChange(`Profissional removido: ${fl?.name}`);};
   const removeProjExp=(id)=>{const e=projectExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover despesa "${e?.type}"?`))return;setProjectExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa removida: ${e?.type}`);};
+  const duplicateCache=(c)=>{setCaches(p=>[...p,{...c,id:Date.now()}]);const fl=freelancers.find(f=>f.id===c.freelancerId);logChange(`Cachê duplicado: ${fl?.apelido||fl?.name}`);};
+  const duplicateProjExp=(e)=>{setProjectExpenses(p=>[...p,{...e,id:Date.now()}]);logChange(`Despesa duplicada: ${e.type}`);};
   const addStudioExpense=()=>{if(!formStudio.desc||!formStudio.value)return;setStudioExpenses(p=>[...p,{...formStudio,id:Date.now(),value:Number(formStudio.value)}]);logChange(`Despesa do estúdio: ${formStudio.desc}`);setFormStudio(emptyStudio);setShowAddStudio(false);};
   const removeStudioExpense=(id)=>{const e=studioExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover "${e?.desc}"?`))return;setStudioExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa do estúdio removida: ${e?.desc}`);};
   const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:Date.now(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
@@ -820,7 +829,7 @@ function AppContent({ onLogout, userEmail }) {
         cancelEdit();
       }} onCancel={cancelEdit} fields={[{key:"role",label:"Função",type:"select",options:ROLES},{key:"desc",label:"Descrição"},{key:"value",label:"Cachê (R$)",type:"number"},{key:"alimentacao",label:"Alimentação (R$)",type:"number"},{key:"logistica",label:"Logística (R$)",type:"number"},{key:"paymentMethod",label:"Forma de pagamento",type:"select",options:PAYMENT_METHODS},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula)"},{key:"dateDue",label:"⏰ Combinado pagar em",type:"date"},{key:"datePaid",label:"✅ Pago em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("projexp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("projexp",setProjectExpenses)} onCancel={cancelEdit} fields={[{key:"type",label:"Tipo",type:"select",options:EXPENSE_TYPES},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"source",label:"Origem",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Parcelas",type:"select",options:["2","3","4","5","6","7","8","9","10","11","12"]},{key:"dateWork",label:"📅 De",type:"date"},{key:"dateFim",label:"📅 Até (opcional)",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
-      {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
+      {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"source",label:"💳 De onde saiu",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Forma de pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Nº de parcelas",type:"select",options:["1","2","3","4","5","6","7","8","9","10","11","12","15","18","24"]},{key:"parcelasPagas",label:"Parcelas já pagas",type:"number"},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
@@ -1400,6 +1409,7 @@ function AppContent({ onLogout, userEmail }) {
                         <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{fl?.name||"\u2014"}{c.desc&&<span style={{color:"#64748b",fontWeight:400}}> \u2014 {c.desc}</span>}{(()=>{if(c.status==="pago")return null;const ref=c.dateDue||c.dateWork;if(!ref)return null;const age=Math.ceil((new Date(today())-new Date(ref))/(1000*60*60*24));if(age>30)return <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",borderRadius:5,padding:"2px 6px",marginLeft:6,fontWeight:700}}>h\u00e1 {age}d sem pagar</span>;return null;})()}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{c.role}{(c.workDates&&c.workDates.length>0)?` \u00b7 \ud83d\udcc5 ${c.workDates.length>1?`${c.workDates.length} di\u00e1rias (${c.workDates[0]} a ${c.workDates[c.workDates.length-1]})`:c.workDates[0]}`:(c.dateWork&&` \u00b7 \ud83d\udcc5 ${c.dateWork}`)}{c.dateDue&&` \u00b7 \u23f0 ${c.dateDue}`}{c.datePaid&&<span style={{color:"#22c55e"}}> \u00b7 \u2705 {c.datePaid}</span>}{c.paymentMethod&&c.status==="pago"&&<span style={{color:"#22c55e"}}> \u00b7 {c.paymentMethod}</span>}</div></div>
                         <div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{formatBRL(total)}</div></div>
                         <button onClick={()=>toggleStatus(caches,setCaches,c.id,["a pagar","pago"])} style={{background:statusColor[c.status]+"22",color:statusColor[c.status],border:`1px solid ${statusColor[c.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{c.status}</button>
+                        <button onClick={()=>duplicateCache(c)} title="Duplicar" style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>⧉</button>
                         <button onClick={()=>startEdit("cache",{...c,workDatesText:(c.workDates||[]).join(", ")})} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
                         <button onClick={()=>removeCache(c.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                       </div>
@@ -1462,6 +1472,7 @@ function AppContent({ onLogout, userEmail }) {
                         <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.type}{item.desc?` — ${item.desc}`:""}{item.link&&<a href={item.link} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,fontSize:11,color:"#22d3ee"}}>🔗 ver reserva</a>}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.dateWork&&<span>📅 {item.dateWork}{item.dateFim?` → ${item.dateFim}`:""}</span>}{item.hospedes&&<span> · 👥 {item.hospedes} hóspede{Number(item.hospedes)>1?"s":""}</span>}{item.datePay&&<span> · 💰 {item.datePay}</span>}{item.paymentType==="parcelado"&&<span style={{color:"#4D7CFE",marginLeft:6}}>📆 {item.parcelas}x</span>}</div></div>
                         <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
                         <button onClick={()=>toggleStatus(projectExpenses,setProjectExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
+                        <button onClick={()=>duplicateProjExp(item)} title="Duplicar" style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>⧉</button>
                         <button onClick={()=>startEdit("projexp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
                         <button onClick={()=>removeProjExp(item.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                       </div>))}
@@ -1592,25 +1603,61 @@ function AppContent({ onLogout, userEmail }) {
           <div>
             <FormCard title="Adicionar Gasto Geral" color="#f87171">
               <Input label="Descrição" value={formE.desc} onChange={v=>setFormE(p=>({...p,desc:v}))}/>
-              <Row><Input label="Valor (R$)" type="number" value={formE.value} onChange={v=>setFormE(p=>({...p,value:v}))}/><Input label="📅 Data do gasto" type="date" value={formE.dateWork} onChange={v=>setFormE(p=>({...p,dateWork:v}))}/></Row>
-              <Row><Input label="💰 Data pagamento" type="date" value={formE.datePay} onChange={v=>setFormE(p=>({...p,datePay:v}))}/><Select label="Categoria" value={formE.category} onChange={v=>setFormE(p=>({...p,category:v}))} options={CATEGORIES_EXPENSE}/></Row>
+              <Row><Input label="Valor total (R$)" type="number" value={formE.value} onChange={v=>setFormE(p=>({...p,value:v}))}/><Select label="Categoria" value={formE.category} onChange={v=>setFormE(p=>({...p,category:v}))} options={CATEGORIES_EXPENSE}/></Row>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>💳 De onde saiu o dinheiro</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{PAYMENT_SOURCES.map(s=>{const cor=SOURCE_COLOR[s]||"#94a3b8";const sel=formE.source===s;return(<button key={s} onClick={()=>setFormE(p=>({...p,source:s}))} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#000":cor,border:`1px solid ${cor}66`}}>{s}</button>);})}</div>
+              </div>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Forma de pagamento</div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  {["à vista","parcelado"].map(pt=>(<button key={pt} onClick={()=>setFormE(p=>({...p,paymentType:pt,parcelas:pt==="à vista"?"1":(p.parcelas==="1"?"2":p.parcelas)}))} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:formE.paymentType===pt?"#4D7CFE":"#4D7CFE22",color:formE.paymentType===pt?"#fff":"#4D7CFE"}}>{pt==="à vista"?"💵 À vista":"📆 Parcelado"}</button>))}
+                  {formE.paymentType==="parcelado"&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:12,color:"#64748b"}}>Em</span><select value={formE.parcelas} onChange={e=>setFormE(p=>({...p,parcelas:e.target.value}))} style={{background:"#050507",border:"1px solid #ffffff20",borderRadius:6,padding:"4px 8px",color:"#e2e8f0",fontSize:12}}>{["2","3","4","5","6","7","8","9","10","11","12","15","18","24"].map(n=><option key={n}>{n}</option>)}</select><span style={{fontSize:12,color:"#64748b"}}>vezes</span></div>}
+                </div>
+              </div>
+              {formE.paymentType==="parcelado"&&<Row><Input label="Quantas parcelas já pagou" type="number" value={formE.parcelasPagas} onChange={v=>setFormE(p=>({...p,parcelasPagas:v}))}/><Input label="📅 Data do gasto" type="date" value={formE.dateWork} onChange={v=>setFormE(p=>({...p,dateWork:v}))}/></Row>}
+              {formE.paymentType==="à vista"&&<Row><Input label="📅 Data do gasto" type="date" value={formE.dateWork} onChange={v=>setFormE(p=>({...p,dateWork:v}))}/><Select label="Status" value={formE.status} onChange={v=>setFormE(p=>({...p,status:v}))} options={["a pagar","pago"]}/></Row>}
               <Row>
                 <Select label="Natureza" value={formE.natureza||"overhead"} onChange={v=>setFormE(p=>({...p,natureza:v,jobId:v==="overhead"?"":p.jobId}))} options={["overhead","vinculado a job"]}/>
                 {(formE.natureza==="vinculado a job")&&<div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job</div><select value={formE.jobId||""} onChange={e=>setFormE(p=>({...p,jobId:Number(e.target.value)}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}><option value="">Selecione...</option>{jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}</select></div>}
               </Row>
-              <Select label="Status" value={formE.status} onChange={v=>setFormE(p=>({...p,status:v}))} options={["a pagar","pago"]}/>
               <AddBtn onClick={addExpense}>+ Adicionar</AddBtn>
             </FormCard>
-            <SummaryPill label={`Total — ${formatBRL(totals.paidExpenses)} pagos`} value={totals.totalExpenses} color="#f87171"/>
+            <SummaryPill label={`Total — ${formatBRL(totals.paidExpenses)} pagos · ${formatBRL(totals.totalExpenses-totals.paidExpenses)} a pagar`} value={totals.totalExpenses} color="#f87171"/>
             {expenses.length===0&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhum gasto lançado ainda.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {[...expenses].reverse().map(item=>(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.dateWork&&` · 📅 ${item.dateWork}`}{item.datePay&&` · 💰 ${item.datePay}`}{item.jobId&&<span style={{color:"#4D7CFE"}}> · {jobs.find(j=>j.id===item.jobId)?.desc||""}</span>}</div></div>
-                <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
-                <button onClick={()=>toggleStatus(expenses,setExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>
-                <button onClick={()=>startEdit("exp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
-                <button onClick={()=>setExpenses(p=>p.filter(e=>e.id!==item.id))} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
-              </div>))}
+              {[...expenses].reverse().map(item=>{
+                const parcelas=Number(item.parcelas||1);const pagas=Number(item.parcelasPagas||0);const isParcelado=item.paymentType==="parcelado"&&parcelas>1;
+                const valorParcela=Number(item.value)/parcelas;const jaPago=isParcelado?valorParcela*pagas:(item.status==="pago"?Number(item.value):0);const falta=Number(item.value)-jaPago;
+                const cor=SOURCE_COLOR[item.source]||"#94a3b8";
+                return(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.source&&<span style={{color:cor}}> · 💳 {item.source}</span>}{item.dateWork&&` · 📅 ${item.dateWork}`}{item.jobId&&<span style={{color:"#4D7CFE"}}> · {jobs.find(j=>j.id===item.jobId)?.desc||""}</span>}{isParcelado&&<span style={{color:"#4D7CFE"}}> · 📆 {parcelas}x de {formatBRL(valorParcela)}</span>}</div>
+                    </div>
+                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}</div>
+                    {!isParcelado&&<button onClick={()=>toggleStatus(expenses,setExpenses,item.id,["a pagar","pago"])} style={{background:statusColor[item.status]+"22",color:statusColor[item.status],border:`1px solid ${statusColor[item.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.status}</button>}
+                    <button onClick={()=>duplicateExpense(item)} title="Duplicar" style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>⧉</button>
+                    <button onClick={()=>startEdit("exp",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                    <button onClick={()=>{if(confirmDelete(`Remover gasto "${item.desc}"?`))setExpenses(p=>p.filter(e=>e.id!==item.id));}} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
+                  </div>
+                  {isParcelado&&(
+                    <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #ffffff08"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <span style={{fontSize:11,color:"#64748b"}}>Parcelas pagas: <span style={{color:"#22c55e",fontWeight:700}}>{pagas}</span> / {parcelas}</span>
+                        <div style={{display:"flex",gap:6}}>
+                          <span style={{fontSize:11,color:"#22c55e"}}>✅ {formatBRL(jaPago)} pago</span>
+                          <span style={{fontSize:11,color:"#f59e0b"}}>⏳ {formatBRL(falta)} falta</span>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <div style={{flex:1,height:6,background:"#050507",borderRadius:3,overflow:"hidden"}}><div style={{width:`${(pagas/parcelas)*100}%`,height:"100%",background:"linear-gradient(90deg,#22c55e,#4ade80)",borderRadius:3}}/></div>
+                        <button onClick={()=>setExpenses(p=>p.map(e=>e.id===item.id?{...e,parcelasPagas:String(Math.max(0,pagas-1)),status:(pagas-1>=parcelas)?"pago":"a pagar"}:e))} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:14,borderRadius:6,padding:"2px 10px",fontWeight:700}}>−</button>
+                        <button onClick={()=>setExpenses(p=>p.map(e=>e.id===item.id?{...e,parcelasPagas:String(Math.min(parcelas,pagas+1)),status:(pagas+1>=parcelas)?"pago":"a pagar"}:e))} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",cursor:"pointer",fontSize:14,borderRadius:6,padding:"2px 10px",fontWeight:700}}>+</button>
+                      </div>
+                    </div>
+                  )}
+                </div>);
+              })}
             </div>
           </div>
         )}
