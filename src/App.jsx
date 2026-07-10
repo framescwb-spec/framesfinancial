@@ -705,6 +705,16 @@ function AppContent({ onLogout, userEmail }) {
     setFormJob(emptyJob);setShowAddJob(false);
   };
   const removeJob=(id)=>{const j=jobs.find(x=>x.id===id);if(!confirmDelete(`Remover job "${j?.desc}"?`))return;setJobs(p=>p.filter(j=>j.id!==id));setCaches(p=>p.filter(c=>c.jobId!==id));setProjectExpenses(p=>p.filter(e=>e.jobId!==id));logChange(`Job removido: ${j?.desc}`);};
+  // Duplica um projeto inteiro: o job em si + todos os cachês da equipe + todas
+  // as despesas vinculadas a ele, gerando novos IDs para tudo. Zera pagamentos
+  // e recebimentos, já que a cópia é um novo projeto do zero.
+  const duplicateJob=(job)=>{
+    const newId=uid();
+    setJobs(p=>[...p,{...job,id:newId,desc:`${job.desc} (cópia)`,payments:[],valorRecebido:0,dateReceived:"",status:"negociação"}]);
+    setCaches(p=>{const orig=p.filter(c=>c.jobId===job.id);return [...p,...orig.map(c=>({...c,id:uid(),jobId:newId,status:"a pagar",datePaid:""}))];});
+    setProjectExpenses(p=>{const orig=p.filter(e=>e.jobId===job.id);return [...p,...orig.map(e=>({...e,id:uid(),jobId:newId,status:"a pagar",parcelasPagas:"0"}))];});
+    logChange(`Projeto duplicado: ${job.desc}`);
+  };
   const addReimb=()=>{if(!formReim.pessoa||!formReim.desc||!formReim.value)return;setReimbursements(p=>[...p,{...formReim,id:uid(),value:Number(formReim.value)}]);logChange(`Reembolso: ${formReim.pessoa}`);setFormReim(emptyReim);};
   const addCacheToJob=()=>{
     if(!formCache.freelancerId||!formCache.value)return;
@@ -1315,6 +1325,7 @@ function AppContent({ onLogout, userEmail }) {
                     <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(job.value)}</div>
                     <button onClick={(e)=>{e.stopPropagation();toggleStatus(jobs,setJobs,job.id,JOB_STATUS);}} style={{background:statusColor[job.status]+"22",color:statusColor[job.status],border:`1px solid ${statusColor[job.status]}44`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{job.status}</button>
                     <button onClick={(e)=>{e.stopPropagation();startEdit("job",{...job,workDatesText:(job.workDates||[]).join(", ")});}} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                    <button onClick={(e)=>{e.stopPropagation();duplicateJob(job);}} title="Duplicar projeto" style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>⧉</button>
                     <button onClick={(e)=>{e.stopPropagation();removeJob(job.id);}} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
                   </div>
                   <div style={{display:"flex",gap:12,fontSize:11,color:"#64748b",paddingTop:6,borderTop:"1px solid #ffffff08"}}>
