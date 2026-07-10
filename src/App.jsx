@@ -815,7 +815,7 @@ function AppContent({ onLogout, userEmail }) {
         input:focus, select:focus { border-color: #4D7CFE66 !important; box-shadow: 0 0 0 3px #4D7CFE15; }
         /* ── Site look: FRAMES/BR design system ── */
         .glow-top { position: fixed; top: -260px; left: 50%; transform: translateX(-50%); width: 900px; height: 600px; background: radial-gradient(ellipse at center, #4D7CFE18 0%, #8B5CF60A 40%, transparent 65%); pointer-events: none; z-index: 0; }
-        .premium-card { position: relative; background: linear-gradient(145deg, #0C0C10 0%, #101018 100%) !important; overflow: hidden; transition: border-color .25s, transform .25s !important; }
+        .premium-card { position: relative; background: linear-gradient(145deg, #0C0C10 0%, #101018 100%) !important; transition: border-color .25s, transform .25s !important; }
         .premium-card::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #4D7CFE, #8B5CF6, transparent); opacity: 0; transition: opacity .25s; }
         .premium-card:hover { border-color: #4D7CFE44 !important; transform: translateY(-3px); }
         .premium-card:hover::after { opacity: 1; }
@@ -1659,7 +1659,7 @@ function AppContent({ onLogout, userEmail }) {
                     const idx=freelancers.findIndex(f=>f.id===fl.id);
                     const fc=caches.filter(c=>c.freelancerId===fl.id);const total=fc.reduce((s,c)=>s+cacheTotal(c),0);const cor=getColor(idx);
                     const isExpanded = expandedFLId===fl.id;
-                    return(<div key={fl.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10,overflow:"hidden"}}>
+                    return(<div key={fl.id} style={{background:"#101014",border:`1px solid ${cor}22`,borderRadius:10}}>
                       <div onClick={()=>fc.length>0&&setExpandedFLId(p=>p===fl.id?null:fl.id)} style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:fc.length>0?"pointer":"default"}}>
                         <div style={{width:40,height:40,borderRadius:"50%",background:cor+"22",border:`2px solid ${cor}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:cor,flexShrink:0}}>{fl.apelido?fl.apelido.slice(0,3):fl.name[0]}</div>
                         <div style={{flex:1}}>
