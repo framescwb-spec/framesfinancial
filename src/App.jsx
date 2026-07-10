@@ -3,6 +3,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { jsPDF } from "jspdf";
+const uid = () => typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 // ── Firebase (dados salvos na nuvem — mesmo projeto "frames-system") ──
 const firebaseConfig = {
@@ -47,87 +48,18 @@ const monthLabel = (key) => { if(!key) return "—"; const [y,m]=key.split("-");
 
 // ── Default data ──
 // CLIENTS: empresas/pessoas que contratam. JOBS: projetos/trabalhos que pertencem a um cliente.
-const DEFAULT_CLIENTS = [
-  {id:1,name:"Corpus Christi"},
-  {id:2,name:"Coolritiba"},
-  {id:3,name:"CBDE"},
-  {id:4,name:"NP"},
-  {id:5,name:"CVS"},
-  {id:6,name:"GINGA"},
-  {id:7,name:"Cruzeiro do Sul"},
-  {id:8,name:"DVD Bruno e Marrone"},
-  {id:9,name:"CWB Brasil"},
-];
+const DEFAULT_CLIENTS = [];
 
-const DEFAULT_JOBS = [
-  {id:101,clientId:1,desc:"Corpus Christi",value:15900,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"",status:"fechado"},
-  {id:102,clientId:2,desc:"Coolritiba",value:17000,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"",status:"fechado"},
-  {id:103,clientId:3,desc:"CBDE",value:19000,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"",status:"fechado"},
-  {id:104,clientId:4,desc:"NP",value:37000,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"",status:"fechado"},
-  {id:105,clientId:5,desc:"CVS",value:32000,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"2026-06-30",status:"fechado"},
-  {id:106,clientId:9,desc:"GINGA",value:22000,valorRecebido:0,nfRate:0.12,dateWork:"",dateDueExpected:"",status:"fechado"},
-  {id:107,clientId:7,desc:"RIO2C",value:17900,valorRecebido:0,nfRate:0.12,dateWork:"2026-06-01",dateDueExpected:"2026-06-30",status:"fechado"},
-];
+const DEFAULT_JOBS = [];
 
-const DEFAULT_REIMBURSEMENTS = [
-  {id:201,pessoa:"Yago",desc:"CBDE",value:2000,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:202,pessoa:"Yago",desc:"COOLRITIBA",value:1200,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:203,pessoa:"Yago",desc:"CORPUS CHRISTI",value:1200,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:204,pessoa:"Graba",desc:"Coolritiba",value:700,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:205,pessoa:"Graba",desc:"DVD Bruno e Marrone",value:500,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:206,pessoa:"Graba",desc:"Corpus Christi",value:550,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:207,pessoa:"Maria",desc:"Coolritiba",value:350,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:208,pessoa:"Maria",desc:"Logística NP",value:100,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:209,pessoa:"Patrocinado",desc:"Coolritiba",value:150,devolvidoPara:"Frames",datePay:"",status:"pendente"},
-  {id:210,pessoa:"Cartão Japa",desc:"Parcela junho",value:1161,devolvidoPara:"Japa",datePay:"2026-06-30",status:"pendente"},
-  {id:211,pessoa:"Cartão Frames",desc:"Parcela julho",value:5340,devolvidoPara:"Frames",datePay:"2026-07-30",status:"pendente"},
-];
+const DEFAULT_REIMBURSEMENTS = [];
 
-const DEFAULT_FREELANCERS = [
-  {id:1,name:"Guilherme Felipe da Silva Filho",role:"Diretor",phone:"(41) 998549018",email:"estudioabertobr@gmail.com",cpf:"000.003.741-99",rg:"73822530 MG",nasc:"19/12/1982",apelido:"XAC"},
-  {id:2,name:"Paulo Guilherme Grabarski de Almeida",role:"Cinegrafista",phone:"(41) 98842-2252",email:"paulgrabarski@gmail.com",cpf:"118.646.279-56",rg:"13.353.125-4",nasc:"26/08/2000",apelido:"GRABA"},
-  {id:3,name:"Yago Cruz Castanho",role:"Cinegrafista",phone:"(41) 99978-9683",email:"yago.castanho@gmail.com",cpf:"087.818.489-94",rg:"12.650.210-9",nasc:"07/02/1994",apelido:"YAGO"},
-  {id:4,name:"Gustavo Gama Nunes",role:"Outro",phone:"(41) 99683-4246",email:"",cpf:"125.160.179-01",rg:"",nasc:"",apelido:"GAMA"},
-  {id:5,name:"Maria Eduarda Morais de Souza",role:"Produtora",phone:"(41) 996420136",email:"mariaaesouza31@icloud.com",cpf:"146.234.409-74",rg:"",nasc:"31/07/2004",apelido:"MARIA"},
-  {id:6,name:"Wystenio da Silveira da Silva",role:"Outro",phone:"89988237319",email:"Wystenio@gmail.com",cpf:"617.456.203-46",rg:"08110291480",nasc:"10/10/2000",apelido:"WYS"},
-  {id:7,name:"Jeferson Pereira dos Santos",role:"Outro",phone:"43 996605174",email:"jefersonps2612@gmail.com",cpf:"080.831.449-16",rg:"124630169",nasc:"08/10/1993",apelido:"JEFF"},
-  {id:8,name:"Marcos Vinícius Silva Gonçalves",role:"Outro",phone:"",email:"contato.sawrus@gmail.com",cpf:"126.680.659-84",rg:"140675415",nasc:"17/12/2003",apelido:"MARCOS"},
-  {id:9,name:"Bruno FPV",role:"Drone",phone:"",email:"",cpf:"",rg:"",nasc:"",apelido:"BRUNO FPV"},
-  {id:10,name:"Ivan",role:"Cinegrafista",phone:"",email:"",cpf:"",rg:"",nasc:"",apelido:"IVAN"},
-  {id:11,name:"Japa",role:"Cinegrafista",phone:"",email:"",cpf:"",rg:"",nasc:"",apelido:"JAPA"},
-  {id:12,name:"João Valeriote",role:"Outro",phone:"",email:"",cpf:"",rg:"",nasc:"",apelido:"VALERIOTE"},
-];
+const DEFAULT_FREELANCERS = [];
 
 // Caches & ProjectExpenses now reference jobId instead of project name
-const DEFAULT_CACHES = [
-  {id:901,freelancerId:2,jobId:107,role:"Cinegrafista",value:2400,alimentacao:200,logistica:0,dateWork:"2026-06-01",dateDue:"",status:"a pagar"},
-  {id:902,freelancerId:1,jobId:107,role:"Editor",value:1200,alimentacao:0,logistica:0,dateWork:"2026-06-01",dateDue:"",status:"a pagar"},
-  {id:910,freelancerId:11,jobId:104,role:"Cinegrafista",value:0,alimentacao:0,logistica:4408,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:911,freelancerId:10,jobId:104,role:"Cinegrafista",value:0,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:912,freelancerId:7,jobId:104,role:"Outro",value:2200,alimentacao:0,logistica:762,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:913,freelancerId:3,jobId:104,role:"Cinegrafista",value:3600,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:914,freelancerId:1,jobId:104,role:"Diretor",value:3500,alimentacao:0,logistica:404,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:915,freelancerId:2,jobId:104,role:"Cinegrafista",value:2800,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:916,freelancerId:5,jobId:104,role:"Produtora",value:1200,alimentacao:0,logistica:802,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:920,freelancerId:9,jobId:101,role:"Drone",value:1200,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:921,freelancerId:11,jobId:101,role:"Cinegrafista",value:1500,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:922,freelancerId:10,jobId:101,role:"Cinegrafista",value:1500,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:923,freelancerId:3,jobId:101,role:"Cinegrafista",value:1200,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:924,freelancerId:4,jobId:101,role:"Editor",value:1000,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-  {id:925,freelancerId:2,jobId:101,role:"Assistente",value:400,alimentacao:0,logistica:0,dateWork:"",dateDue:"",status:"a pagar"},
-];
+const DEFAULT_CACHES = [];
 
-const DEFAULT_PROJ_EXPENSES = [
-  {id:801,jobId:107,type:"Voo",desc:"1/2 frames (x2)",value:523,source:"Cartão Frames",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:802,jobId:107,type:"Alimentação",desc:"Ivan",value:300,source:"Cartão Ivan",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:803,jobId:107,type:"Gastos extras",desc:"Videomaker Ivan",value:3000,source:"Cartão Ivan",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:804,jobId:107,type:"Gastos extras",desc:"Hotel Ivan",value:771,source:"Cartão Frames",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:805,jobId:107,type:"Gastos extras",desc:"Hotel Pia",value:321,source:"Cartão Frames",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:806,jobId:107,type:"Uber",desc:"",value:211,source:"Cartão Frames",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:807,jobId:107,type:"Alimentação",desc:"",value:68,source:"Cartão Frames",paymentType:"à vista",parcelas:"2",dateWork:"2026-06-01",datePay:"",status:"a pagar"},
-  {id:821,jobId:101,type:"Alimentação",desc:"Geral equipe",value:500,source:"Dinheiro",paymentType:"à vista",parcelas:"1",dateWork:"",datePay:"",status:"a pagar"},
-  {id:822,jobId:101,type:"Alimentação",desc:"Pizza e Gole",value:92,source:"Dinheiro",paymentType:"à vista",parcelas:"1",dateWork:"",datePay:"",status:"a pagar"},
-];
+const DEFAULT_PROJ_EXPENSES = [];
 
 const DEFAULT_STUDIO_EXPENSES = [];
 const DEFAULT_SUBSCRIPTIONS = [];
@@ -238,6 +170,7 @@ async function loadFromStorage(defaults) {
         projectExpenses: saved.projectExpenses ?? [],
         studioExpenses: saved.studioExpenses ?? [],
         subscriptions: saved.subscriptions ?? [],
+        demands: saved.demands ?? [],
         accommodations: saved.accommodations ?? [],
         _isExistingDoc: true,
       };
@@ -262,7 +195,7 @@ async function loadFromStorage(defaults) {
   return {
     expenses: [], clients: [], jobs: [], reimbursements: [],
     freelancers: [], caches: [], projectExpenses: [],
-    studioExpenses: [], subscriptions: [], accommodations: [],
+    studioExpenses: [], subscriptions: [], accommodations: [], demands: [],
     _isNewAccount: true,
   };
 }
@@ -286,6 +219,7 @@ function AppContent({ onLogout, userEmail }) {
   const [loaded, setLoaded] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("ok"); // "ok" | "offline"
   const [syncNotice, setSyncNotice] = useState(false);
   useEffect(() => { onStorageError = (msg) => setSaveError(msg); return () => { onStorageError = null; }; }, []);
 
@@ -319,6 +253,7 @@ function AppContent({ onLogout, userEmail }) {
   const [projectExpenses, setProjectExpenses] = useState([]);
   const [studioExpenses, setStudioExpenses] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [demands, setDemands] = useState([]);
 
   const applyLoadedData = (data) => {
     // Conta nova: aplica exatamente o que veio (tudo vazio), sem misturar com
@@ -326,7 +261,7 @@ function AppContent({ onLogout, userEmail }) {
     if (data._isNewAccount) {
       setExpenses([]); setClients([]); setJobs([]); setReimbursements([]);
       setFreelancers([]); setCaches([]); setProjectExpenses([]);
-      setStudioExpenses([]); setSubscriptions([]);
+      setStudioExpenses([]); setSubscriptions([]); setDemands([]);
       return;
     }
 
@@ -368,6 +303,11 @@ function AppContent({ onLogout, userEmail }) {
       if (m.dateInvoice === undefined) m.dateInvoice = "";
       if (m.dateReceived === undefined) m.dateReceived = "";
       if (!Array.isArray(m.payments)) m.payments = [];
+      // Se já há um valor em valorRecebido mas payments[] ainda está vazio,
+      // cria um registro de pagamento retroativo para unificar os dois sistemas.
+      if (m.payments.length === 0 && Number(m.valorRecebido||0) > 0) {
+        m.payments = [{id: uid(), value: Number(m.valorRecebido), date: m.dateReceived || today(), note: "Migrado"}];
+      }
       if (!Array.isArray(m.workDates)) m.workDates = m.dateWork ? [m.dateWork] : [];
       if (m.produtoraRate === undefined) m.produtoraRate = 0;
       if (m.status === "pendente") m.status = "fechado";
@@ -411,8 +351,15 @@ function AppContent({ onLogout, userEmail }) {
     }
     setProjectExpenses(mergedProjExp);
 
-    setStudioExpenses(Array.isArray(data.studioExpenses) ? data.studioExpenses : []);
+    setStudioExpenses((Array.isArray(data.studioExpenses) ? data.studioExpenses : []).map(e => {
+      if (e.monthly && typeof e.monthly === "object") return e;
+      // Migração: despesa antiga tinha só um valor fixo. Semeia o histórico mensal
+      // com esse valor no mês atual, para não perder a informação existente.
+      const mk = today().slice(0,7);
+      return { ...e, monthly: e.value ? { [mk]: Number(e.value) } : {} };
+    }));
     setSubscriptions(Array.isArray(data.subscriptions) ? data.subscriptions : []);
+    setDemands(Array.isArray(data.demands) ? data.demands : []);
   };
 
   useEffect(() => {
@@ -449,6 +396,7 @@ function AppContent({ onLogout, userEmail }) {
           const saved = snap.data();
           lastSavedHash = hashData(saved); // evita que o auto-save regrave o que acabou de chegar
           applyLoadedData(saved);
+          setSyncStatus("ok");
           if (!isFirstSnapshot) {
             setSyncNotice(true);
             setTimeout(() => setSyncNotice(false), 2500);
@@ -456,9 +404,11 @@ function AppContent({ onLogout, userEmail }) {
           isFirstSnapshot = false;
         }, (err) => {
           console.error("Erro na sincronização em tempo real:", err);
+          setSyncStatus("offline");
         });
       } catch (e) {
         console.error("Não foi possível iniciar sincronização em tempo real:", e);
+        setSyncStatus("offline");
       }
     });
 
@@ -525,7 +475,7 @@ function AppContent({ onLogout, userEmail }) {
 
   const saveNow = async () => {
     setIsSavingNow(true);
-    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+    const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, demands });
     hasPendingLocalChanges.current = false;
     setIsSavingNow(false);
     if (ok) {
@@ -539,14 +489,14 @@ function AppContent({ onLogout, userEmail }) {
     hasPendingLocalChanges.current = true;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      const ok = await saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, demands });
       hasPendingLocalChanges.current = false;
       if (ok) {
         setSavedIndicator(true);
         setTimeout(() => setSavedIndicator(false), 2000);
       }
     }, 1200);
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, demands, loaded]);
 
   // Force an immediate save if the person closes the tab, refreshes, or switches
   // away before the debounce timer above has fired — prevents losing the last
@@ -555,7 +505,7 @@ function AppContent({ onLogout, userEmail }) {
     if (!loaded) return;
     const flush = () => {
       clearTimeout(saveTimer.current);
-      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions });
+      saveToStorage({ expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, demands });
     };
     const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
     window.addEventListener("beforeunload", flush);
@@ -564,11 +514,14 @@ function AppContent({ onLogout, userEmail }) {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, loaded]);
+  }, [expenses, clients, jobs, reimbursements, freelancers, caches, projectExpenses, studioExpenses, subscriptions, demands, loaded]);
 
   const emptyE = {desc:"",value:"",category:"Outros",jobId:"",natureza:"overhead",source:PAYMENT_SOURCES[0],paymentType:"à vista",parcelas:"1",parcelasPagas:"0",dateWork:today(),datePay:"",status:"a pagar"};
-  const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true};
+  const emptyStudio = {desc:"",value:"",category:STUDIO_CATEGORIES[0],dayOfMonth:"5",dateStart:today(),active:true,monthly:{}};
   const emptySub = {desc:"",value:"",category:SUB_CATEGORIES[0],cycle:"mensal",dayOfMonth:"1",dateStart:today(),active:true};
+  const DEMAND_STATUS = ["a fazer","fazendo","feito"];
+  const DEMAND_PRIORITY = {"alta":"#ef4444","média":"#f59e0b","baixa":"#22c55e"};
+  const emptyDemand = {desc:"",responsavelId:"",jobId:"",prazo:"",prioridade:"média",status:"a fazer",notes:""};
   const emptyClient = {name:""};
   const emptyJob = {desc:"",value:"",valorRecebido:"0",nfRate:0.12,produtoraRate:"",dateWork:today(),workDates:[],dateDelivery:"",dateInvoice:"",dateDueExpected:"",dateReceived:"",payments:[],status:"negociação",notes:"",contrato:""};
   const emptyReim = {pessoa:"",desc:"",value:"",tipo:"Adiantamento profissional",devolvidoPara:"Frames",datePay:"",status:"pendente"};
@@ -585,7 +538,14 @@ function AppContent({ onLogout, userEmail }) {
   const [formProjExp, setFormProjExp] = useState(emptyProjExp);
   const [formStudio, setFormStudio] = useState(emptyStudio);
   const [formSub, setFormSub] = useState(emptySub);
+  const [formDemand, setFormDemand] = useState(emptyDemand);
+  const [showAddDemand, setShowAddDemand] = useState(false);
   const [showAddStudio, setShowAddStudio] = useState(false);
+  const [expandedStudio, setExpandedStudio] = useState(null);
+  const [rankScope, setRankScope] = useState("geral"); // geral | mensal
+  const [rankMonth, setRankMonth] = useState(today().slice(0,7));
+  const [newMonthKey, setNewMonthKey] = useState(today().slice(0,7));
+  const [newMonthVal, setNewMonthVal] = useState("");
   const [showAddSub, setShowAddSub] = useState(false);
 
   const cacheTotal = (c) => Number(c.value)+Number(c.alimentacao||0)+Number(c.logistica||0);
@@ -623,7 +583,8 @@ function AppContent({ onLogout, userEmail }) {
     const balance=received-paidExpenses-cachesPagos-reimbReceived;
     // Projected now correctly deducts NF from each job's value
     const projected=totalLiquido-totalExpenses-totalCaches-totalProjExp-totalReimb;
-    const studioFixedMonthly=studioExpenses.filter(e=>e.active!==false).reduce((s,e)=>s+Number(e.value),0);
+    const studioLatest=(e)=>{const ks=Object.keys(e.monthly||{}).sort();return ks.length?Number(e.monthly[ks[ks.length-1]]||0):Number(e.value||0);};
+    const studioFixedMonthly=studioExpenses.filter(e=>e.active!==false).reduce((s,e)=>s+studioLatest(e),0);
     const subsFixedMonthly=subscriptions.filter(e=>e.active!==false).reduce((s,e)=>s+(e.cycle==="anual"?Number(e.value)/12:Number(e.value)),0);
     const totalFixedMonthly=studioFixedMonthly+subsFixedMonthly;
     return {totalExpenses,paidExpenses,totalReceivables,totalNF,totalLiquido,received,totalReimb,reimbReceived,reimbPending,totalCaches,cachesPagos,cachesAPagar,totalProjExp,balance,projected,studioFixedMonthly,subsFixedMonthly,totalFixedMonthly};
@@ -699,9 +660,22 @@ function AppContent({ onLogout, userEmail }) {
     return results.slice(0,8);
   },[searchQuery,clients,jobs,freelancers]);
 
-  const addExpense=()=>{if(!formE.desc||!formE.value)return;const parcelas=formE.paymentType==="parcelado"?formE.parcelas:"1";const parcelasPagas=formE.paymentType==="parcelado"?formE.parcelasPagas:(formE.status==="pago"?"1":"0");setExpenses(p=>[...p,{...formE,id:Date.now(),value:Number(formE.value),parcelas,parcelasPagas,status:formE.paymentType==="parcelado"?(Number(parcelasPagas)>=Number(parcelas)?"pago":"a pagar"):formE.status}]);logChange(`Gasto: ${formE.desc}`);setFormE(emptyE);};
-  const duplicateExpense=(item)=>{setExpenses(p=>[...p,{...item,id:Date.now(),desc:`${item.desc} (cópia)`}]);logChange(`Gasto duplicado: ${item.desc}`);};
-  const addClient=()=>{if(!formClient.name)return;setClients(p=>[...p,{...formClient,id:Date.now()}]);logChange(`Cliente adicionado: ${formClient.name}`);setFormClient(emptyClient);setShowAddClient(false);};
+  // Gera as datas de vencimento reais de cada parcela a partir da data do gasto.
+  // Ex: gasto em 2026-06-10, 3x → vence 2026-07-10, 2026-08-10, 2026-09-10
+  const buildParcelaDates = (dateWork, numParcelas) => {
+    if (!dateWork || !numParcelas) return [];
+    const dates = [];
+    const base = new Date(dateWork + "T12:00:00");
+    for (let i = 1; i <= Number(numParcelas); i++) {
+      const d = new Date(base);
+      d.setMonth(d.getMonth() + i);
+      dates.push(d.toISOString().split("T")[0]);
+    }
+    return dates;
+  };
+  const addExpense=()=>{if(!formE.desc||!formE.value)return;const parcelas=formE.paymentType==="parcelado"?formE.parcelas:"1";const parcelasPagas=formE.paymentType==="parcelado"?formE.parcelasPagas:(formE.status==="pago"?"1":"0");const parcelaDates=formE.paymentType==="parcelado"?buildParcelaDates(formE.dateWork,parcelas):[];setExpenses(p=>[...p,{...formE,id:uid(),value:Number(formE.value),parcelas,parcelasPagas,parcelaDates,status:formE.paymentType==="parcelado"?(Number(parcelasPagas)>=Number(parcelas)?"pago":"a pagar"):formE.status}]);logChange(`Gasto: ${formE.desc}`);setFormE(emptyE);};
+  const duplicateExpense=(item)=>{setExpenses(p=>[...p,{...item,id:uid(),desc:`${item.desc} (cópia)`}]);logChange(`Gasto duplicado: ${item.desc}`);};
+  const addClient=()=>{if(!formClient.name)return;setClients(p=>[...p,{...formClient,id:uid()}]);logChange(`Cliente adicionado: ${formClient.name}`);setFormClient(emptyClient);setShowAddClient(false);};
   const removeClient=(id)=>{
     const cl=clients.find(c=>c.id===id);
     if(!confirmDelete(`Remover cliente "${cl?.name}" e todos os jobs, cachês e despesas vinculados?`)) return;
@@ -726,34 +700,67 @@ function AppContent({ onLogout, userEmail }) {
   const addJob=()=>{
     if(!formJob.desc||!formJob.value||!selectedClient)return;
     const wd=(formJob.workDates||[]).slice().sort();
-    setJobs(p=>[...p,{...formJob,id:Date.now(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate),produtoraRate:Number(formJob.produtoraRate||0),workDates:wd,dateWork:wd[0]||""}]);
+    setJobs(p=>[...p,{...formJob,id:uid(),clientId:selectedClient,value:Number(formJob.value),valorRecebido:Number(formJob.valorRecebido||0),nfRate:Number(formJob.nfRate),produtoraRate:Number(formJob.produtoraRate||0),workDates:wd,dateWork:wd[0]||""}]);
     logChange(`Job adicionado: ${formJob.desc}`);
     setFormJob(emptyJob);setShowAddJob(false);
   };
   const removeJob=(id)=>{const j=jobs.find(x=>x.id===id);if(!confirmDelete(`Remover job "${j?.desc}"?`))return;setJobs(p=>p.filter(j=>j.id!==id));setCaches(p=>p.filter(c=>c.jobId!==id));setProjectExpenses(p=>p.filter(e=>e.jobId!==id));logChange(`Job removido: ${j?.desc}`);};
-  const addReimb=()=>{if(!formReim.pessoa||!formReim.desc||!formReim.value)return;setReimbursements(p=>[...p,{...formReim,id:Date.now(),value:Number(formReim.value)}]);logChange(`Reembolso: ${formReim.pessoa}`);setFormReim(emptyReim);};
+  const addReimb=()=>{if(!formReim.pessoa||!formReim.desc||!formReim.value)return;setReimbursements(p=>[...p,{...formReim,id:uid(),value:Number(formReim.value)}]);logChange(`Reembolso: ${formReim.pessoa}`);setFormReim(emptyReim);};
   const addCacheToJob=()=>{
     if(!formCache.freelancerId||!formCache.value)return;
     const fl=freelancers.find(f=>f.id===formCache.freelancerId);
     const wd=(formCache.workDates||[]).slice().sort();
-    setCaches(p=>[...p,{...formCache,id:Date.now(),jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0),workDates:wd,dateWork:wd[0]||formCache.dateWork||""}]);
+    setCaches(p=>[...p,{...formCache,id:uid(),jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0),workDates:wd,dateWork:wd[0]||formCache.dateWork||""}]);
     logChange(`Cache: ${fl?.apelido||fl?.name}`);
     // Mantém as diárias preenchidas para o próximo profissional que for adicionado
     // neste mesmo job — só limpa quem é a pessoa, valor e outros dados pessoais.
     setFormCache({...emptyCache, workDates: wd, dateWork: wd[0]||formCache.dateWork||"", dateDue: formCache.dateDue});
   };
-  const addProjectExpense=()=>{if(!formProjExp.value)return;setProjectExpenses(p=>[...p,{...formProjExp,id:Date.now(),jobId:selectedJob,value:Number(formProjExp.value)}]);logChange(`Despesa: ${formProjExp.type}`);setFormProjExp(emptyProjExp);setShowAddExpense(false);};
+  const addProjectExpense=()=>{if(!formProjExp.value)return;setProjectExpenses(p=>[...p,{...formProjExp,id:uid(),jobId:selectedJob,value:Number(formProjExp.value)}]);logChange(`Despesa: ${formProjExp.type}`);setFormProjExp(emptyProjExp);setShowAddExpense(false);};
   const removeCache=(id)=>{const c=caches.find(x=>x.id===id);const fl=freelancers.find(f=>f.id===c?.freelancerId);if(!confirmDelete(`Remover cachê de ${fl?.apelido||fl?.name}?`))return;setCaches(p=>p.filter(c=>c.id!==id));logChange(`Cache removido: ${fl?.apelido||fl?.name}`);};
   const removeFreelancer=(id)=>{const fl=freelancers.find(f=>f.id===id);if(!confirmDelete(`Remover profissional "${fl?.name}"?`))return;setFreelancers(p=>p.filter(f=>f.id!==id));setCaches(p=>p.filter(c=>c.freelancerId!==id));logChange(`Profissional removido: ${fl?.name}`);};
   const removeProjExp=(id)=>{const e=projectExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover despesa "${e?.type}"?`))return;setProjectExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa removida: ${e?.type}`);};
-  const duplicateCache=(c)=>{setCaches(p=>[...p,{...c,id:Date.now()}]);const fl=freelancers.find(f=>f.id===c.freelancerId);logChange(`Cachê duplicado: ${fl?.apelido||fl?.name}`);};
-  const duplicateProjExp=(e)=>{setProjectExpenses(p=>[...p,{...e,id:Date.now()}]);logChange(`Despesa duplicada: ${e.type}`);};
-  const addStudioExpense=()=>{if(!formStudio.desc||!formStudio.value)return;setStudioExpenses(p=>[...p,{...formStudio,id:Date.now(),value:Number(formStudio.value)}]);logChange(`Despesa do estúdio: ${formStudio.desc}`);setFormStudio(emptyStudio);setShowAddStudio(false);};
+  const duplicateCache=(c)=>{setCaches(p=>[...p,{...c,id:uid()}]);const fl=freelancers.find(f=>f.id===c.freelancerId);logChange(`Cachê duplicado: ${fl?.apelido||fl?.name}`);};
+  const duplicateProjExp=(e)=>{setProjectExpenses(p=>[...p,{...e,id:uid()}]);logChange(`Despesa duplicada: ${e.type}`);};
+  // Valor mais recente registrado de uma despesa (mês mais alto no histórico).
+  const studioLatestValue = (e) => {
+    const keys = Object.keys(e.monthly||{}).sort();
+    if (keys.length===0) return Number(e.value||0);
+    return Number(e.monthly[keys[keys.length-1]]||0);
+  };
+  const studioLatestMonth = (e) => {
+    const keys = Object.keys(e.monthly||{}).sort();
+    return keys.length ? keys[keys.length-1] : null;
+  };
+  const addStudioExpense=()=>{
+    if(!formStudio.desc||!formStudio.value)return;
+    const mk = today().slice(0,7);
+    setStudioExpenses(p=>[...p,{...formStudio,id:uid(),value:Number(formStudio.value),monthly:{[mk]:Number(formStudio.value)}}]);
+    logChange(`Despesa do estúdio: ${formStudio.desc}`);
+    setFormStudio(emptyStudio);setShowAddStudio(false);
+  };
+  // Define/atualiza o valor de um mês específico de uma despesa fixa.
+  const setStudioMonthValue=(id,monthKey,val)=>{
+    setStudioExpenses(p=>p.map(e=>{
+      if(e.id!==id)return e;
+      const monthly={...(e.monthly||{})};
+      if(val===""||val===null){delete monthly[monthKey];}
+      else{monthly[monthKey]=Number(val);}
+      return {...e,monthly};
+    }));
+  };
   const removeStudioExpense=(id)=>{const e=studioExpenses.find(x=>x.id===id);if(!confirmDelete(`Remover "${e?.desc}"?`))return;setStudioExpenses(p=>p.filter(e=>e.id!==id));logChange(`Despesa do estúdio removida: ${e?.desc}`);};
-  const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:Date.now(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
+  const addSubscription=()=>{if(!formSub.desc||!formSub.value)return;setSubscriptions(p=>[...p,{...formSub,id:uid(),value:Number(formSub.value)}]);logChange(`Assinatura: ${formSub.desc}`);setFormSub(emptySub);setShowAddSub(false);};
   const removeSubscription=(id)=>{const e=subscriptions.find(x=>x.id===id);if(!confirmDelete(`Remover assinatura "${e?.desc}"?`))return;setSubscriptions(p=>p.filter(e=>e.id!==id));logChange(`Assinatura removida: ${e?.desc}`);};
+  const addDemand=()=>{if(!formDemand.desc)return;setDemands(p=>[...p,{...formDemand,id:uid()}]);logChange(`Demanda: ${formDemand.desc}`);setFormDemand(emptyDemand);setShowAddDemand(false);};
+  const removeDemand=(id)=>{const d=demands.find(x=>x.id===id);if(!confirmDelete(`Remover demanda "${d?.desc}"?`))return;setDemands(p=>p.filter(d=>d.id!==id));logChange(`Demanda removida: ${d?.desc}`);};
+  const moveDemand=(id,dir)=>{setDemands(p=>p.map(d=>{if(d.id!==id)return d;const i=DEMAND_STATUS.indexOf(d.status);const ni=Math.min(DEMAND_STATUS.length-1,Math.max(0,i+dir));return {...d,status:DEMAND_STATUS[ni]};}));};
 
-  const tabs=[{key:"profissionais",label:"Profissionais"},{key:"dashboard",label:"Balanço"},{key:"clients",label:"Clientes"},{key:"expenses",label:"Gastos"},{key:"studio",label:"Estúdio"},{key:"subscriptions",label:"Assinaturas"},{key:"reimbursements",label:"Reembolsos"}];
+  const tabGroups = [
+    { label:"Operacional", tabs:[{key:"demandas",label:"Demandas"},{key:"clients",label:"Clientes"},{key:"profissionais",label:"Profissionais"}] },
+    { label:"Financeiro",  tabs:[{key:"dashboard",label:"Balanço"},{key:"expenses",label:"Gastos"},{key:"studio",label:"Estúdio"},{key:"subscriptions",label:"Assinaturas"},{key:"reimbursements",label:"Reembolsos"}] },
+  ];
+  const tabs=tabGroups.flatMap(g=>g.tabs);
 
   // ── Derived: client / job helpers ──
   const clientJobs = (clientId) => jobs.filter(j=>j.clientId===clientId);
@@ -790,9 +797,11 @@ function AppContent({ onLogout, userEmail }) {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         @media (max-width: 480px) {
           .grid-2 { grid-template-columns: 1fr !important; }
+          .grid-3 { grid-template-columns: 1fr !important; }
           .hide-mobile { display: none !important; }
           .font-large { font-size: 14px !important; }
         }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         input, select, button { -webkit-tap-highlight-color: transparent; font-family: 'Space Grotesk','Inter',sans-serif; }
         * { box-sizing: border-box; }
         ::selection { background: #4D7CFE44; }
@@ -832,6 +841,7 @@ function AppContent({ onLogout, userEmail }) {
       {editingId&&editingId.startsWith("exp:")&&<EditModal editData={editData} setEditData={setEditData} color="#f87171" onSave={()=>saveEdit("exp",setExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:CATEGORIES_EXPENSE},{key:"source",label:"💳 De onde saiu",type:"select",options:PAYMENT_SOURCES},{key:"paymentType",label:"Forma de pagamento",type:"select",options:["à vista","parcelado"]},{key:"parcelas",label:"Nº de parcelas",type:"select",options:["1","2","3","4","5","6","7","8","9","10","11","12","15","18","24"]},{key:"parcelasPagas",label:"Parcelas já pagas",type:"number"},{key:"dateWork",label:"Data do gasto",type:"date"},{key:"status",label:"Status",type:"select",options:["a pagar","pago"]}]}/>}
       {editingId&&editingId.startsWith("studio:")&&<EditModal editData={editData} setEditData={setEditData} color="#22d3ee" onSave={()=>saveEdit("studio",setStudioExpenses)} onCancel={cancelEdit} fields={[{key:"desc",label:"Descrição"},{key:"value",label:"Valor mensal (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:STUDIO_CATEGORIES},{key:"dayOfMonth",label:"Dia do vencimento",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
       {editingId&&editingId.startsWith("sub:")&&<EditModal editData={editData} setEditData={setEditData} color="#facc15" onSave={()=>saveEdit("sub",setSubscriptions)} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome"},{key:"value",label:"Valor (R$)",type:"number"},{key:"category",label:"Categoria",type:"select",options:SUB_CATEGORIES},{key:"cycle",label:"Cobrança",type:"select",options:BILLING_CYCLES},{key:"dayOfMonth",label:"Dia da cobrança",type:"number"},{key:"dateStart",label:"Ativo desde",type:"date"}]}/>}
+      {editingId&&editingId.startsWith("demand:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{setDemands(p=>p.map(i=>i.id===editData.id?{...editData,responsavelId:editData.responsavelId?Number(editData.responsavelId):"",jobId:editData.jobId?Number(editData.jobId):""}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"desc",label:"Demanda"},{key:"responsavelId",label:"Responsável",type:"select",options:[{value:"",label:"Sem responsável"},...freelancers.map(f=>({value:f.id,label:f.apelido||f.name}))]},{key:"jobId",label:"Job vinculado",type:"select",options:[{value:"",label:"Nenhum"},...jobs.map(j=>({value:j.id,label:j.desc}))]},{key:"prazo",label:"⏰ Prazo",type:"date"},{key:"prioridade",label:"Prioridade",type:"select",options:["alta","média","baixa"]},{key:"status",label:"Status",type:"select",options:["a fazer","fazendo","feito"]},{key:"notes",label:"Observações"}]}/>}
       {editingId&&editingId.startsWith("fl:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{setFreelancers(p=>p.map(i=>i.id===editData.id?{...editData}:i));setEditingId(null);setEditData({});}} onCancel={cancelEdit} fields={[{key:"name",label:"Nome completo"},{key:"apelido",label:"Apelido"},{key:"role",label:"Função",type:"select",options:ROLES},{key:"phone",label:"WhatsApp"},{key:"email",label:"E-mail"},{key:"cpf",label:"CPF"},{key:"rg",label:"RG"},{key:"nasc",label:"Nascimento"}]}/>}
 
       {/* Error banner — shows real Firebase errors directly on screen, no devtools needed */}
@@ -846,13 +856,19 @@ function AppContent({ onLogout, userEmail }) {
       <div style={{background:"#05050799",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderBottom:"1px solid #ffffff08",padding:"20px 24px 0",position:"sticky",top:0,zIndex:90}}>
         <div style={{maxWidth:820,margin:"0 auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
-            <div style={{display:"flex",alignItems:"baseline",gap:12}}>
-              <h1 style={{margin:0,fontSize:20,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
-              <span className="sec-tag">Financial System</span>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              {(selectedClient||selectedJob)&&(
+                <button onClick={()=>{ if(selectedJob){setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);} else {setSelectedClient(null);} }} title="Voltar" style={{background:"#4D7CFE18",border:"1px solid #4D7CFE44",color:"#4D7CFE",borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>‹ Voltar</button>
+              )}
+              <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+                <h1 style={{margin:0,fontSize:20,fontWeight:700,color:"#fff",letterSpacing:"-0.5px"}}>FRAMES<span style={{color:"#4D7CFE"}}>/</span>BR</h1>
+                <span className="sec-tag">Financial System</span>
+              </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span className="mono" style={{fontSize:10,color:savedIndicator?"#22c55e":"#3F3F46",transition:"color .3s",letterSpacing:"1px",textTransform:"uppercase"}}>{savedIndicator?"● Salvo":"○ Auto-save"}</span>
+              <span className="mono" style={{fontSize:10,color:savedIndicator?"#22c55e":syncStatus==="offline"?"#ef4444":"#3F3F46",transition:"color .3s",letterSpacing:"1px",textTransform:"uppercase"}}>{savedIndicator?"● Salvo":syncStatus==="offline"?"● Offline":"○ Auto-save"}</span>
               {syncNotice&&<span className="mono" style={{fontSize:10,color:"#22d3ee",letterSpacing:"1px"}}>⟳ SYNC</span>}
+              {syncStatus==="offline"&&<span className="mono" style={{fontSize:10,color:"#ef4444",letterSpacing:"1px"}}>Sem conexão com Firebase</span>}
               <button onClick={saveNow} disabled={isSavingNow} style={{background:"transparent",border:"1px solid #232329",color:"#A1A1AA",borderRadius:6,padding:"6px 14px",fontSize:11,fontWeight:500,cursor:isSavingNow?"default":"pointer",opacity:isSavingNow?0.5:1}}>
                 {isSavingNow?"Salvando…":"Salvar"}
               </button>
@@ -891,7 +907,23 @@ function AppContent({ onLogout, userEmail }) {
             )}
           </div>
           <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-            {tabs.map(t=>(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"10px 14px",border:"none",borderBottom:"2px solid transparent",borderImage:tab===t.key?"linear-gradient(90deg,#4D7CFE,#8B5CF6) 1":"none",cursor:"pointer",fontSize:12,fontWeight:tab===t.key?600:500,background:"transparent",color:tab===t.key?"#fff":"#71717A",transition:"all .15s"}}>{t.label}</button>))}
+            <div style={{display:"flex",alignItems:"flex-end",gap:0}}>
+              {tabGroups.map((group,gi)=>(<div key={group.label} style={{display:"flex",alignItems:"flex-end",gap:0}}>
+                {gi>0&&<div style={{width:1,height:28,background:"#1C1C22",margin:"0 8px",alignSelf:"flex-end",marginBottom:0}}/>}
+                <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                  <span className="mono" style={{fontSize:8,color:"#3F3F46",letterSpacing:"2px",textTransform:"uppercase",paddingLeft:14,marginBottom:2}}>{group.label}</span>
+                  <div style={{display:"flex"}}>
+                    {group.tabs.map(t=>{
+                      const hasAlert=t.key==="demandas"&&demands.some(d=>d.status!=="feito"&&d.prazo&&d.prazo<today());
+                      return(<button key={t.key} onClick={()=>{setTab(t.key);setSelectedClient(null);setSelectedJob(null);setShowAddFL(false);setShowAddExpense(false);setShowAddClient(false);setShowAddJob(false);setSearchQuery("");}} style={{padding:"10px 14px",border:"none",borderBottom:"2px solid transparent",borderImage:tab===t.key?"linear-gradient(90deg,#4D7CFE,#8B5CF6) 1":"none",cursor:"pointer",fontSize:12,fontWeight:tab===t.key?600:500,background:"transparent",color:tab===t.key?"#fff":"#71717A",transition:"all .15s",position:"relative"}}>
+                        {t.label}
+                        {hasAlert&&<span style={{position:"absolute",top:6,right:6,width:6,height:6,borderRadius:"50%",background:"#ef4444"}}/>}
+                      </button>);
+                    })}
+                  </div>
+                </div>
+              </div>))}
+            </div>
           </div>
         </div>
       </div>
@@ -905,6 +937,33 @@ function AppContent({ onLogout, userEmail }) {
               {[{key:"geral",label:"Geral"},{key:"apagar",label:"A Pagar"},{key:"vencimentos",label:"Vencimentos"},{key:"mensal",label:"Por Mês"}].map(st=>(<button key={st.key} onClick={()=>setDashSubTab(st.key)} style={{padding:"8px 16px",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,borderRadius:8,background:dashSubTab===st.key?"#4D7CFE":"#101014",color:dashSubTab===st.key?"#fff":"#64748b"}}>{st.label}{st.key==="apagar"&&weeklyAPagar.length>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,marginLeft:6}}>{weeklyAPagar.length}</span>}</button>))}
             </div>
             {dashSubTab==="geral"&&(<>
+              {(()=>{
+                const demandasAtrasadas=demands.filter(d=>d.status!=="feito"&&d.prazo&&d.prazo<today());
+                const parcelasVencendo=expenses.filter(e=>{
+                  if(e.paymentType!=="parcelado")return false;
+                  const pagas=Number(e.parcelasPagas||0);
+                  const dates=e.parcelaDates||[];
+                  const next=dates[pagas];
+                  if(!next)return false;
+                  const diff=(new Date(next)-new Date(today()))/(1000*60*60*24);
+                  return diff<=7&&diff>=-1; // vence nos próximos 7 dias ou ontem
+                });
+                if(!demandasAtrasadas.length&&!parcelasVencendo.length)return null;
+                return(<div style={{background:"#ef444412",border:"1px solid #ef444433",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#ef4444",marginBottom:10,letterSpacing:"1px",textTransform:"uppercase"}}>⚠ Requer atenção</div>
+                  {demandasAtrasadas.map(d=>{const resp=freelancers.find(f=>f.id===d.responsavelId);return(<div key={d.id} onClick={()=>setTab("demandas")} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,cursor:"pointer"}}>
+                    <span style={{fontSize:10,background:"#ef444422",color:"#ef4444",borderRadius:4,padding:"2px 6px",flexShrink:0,fontFamily:"monospace"}}>DEMANDA</span>
+                    <span style={{fontSize:12,color:"#e2e8f0",flex:1}}>{d.desc}</span>
+                    {resp&&<span style={{fontSize:11,color:"#64748b"}}>{resp.apelido||resp.name.split(" ")[0]}</span>}
+                    <span style={{fontSize:11,color:"#ef4444",fontWeight:600}}>Prazo: {d.prazo}</span>
+                  </div>);})}
+                  {parcelasVencendo.map(e=>{const pagas=Number(e.parcelasPagas||0);const parcelas=Number(e.parcelas||1);const next=e.parcelaDates?.[pagas];const diff=Math.ceil((new Date(next)-new Date(today()))/(1000*60*60*24));return(<div key={e.id} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:10,background:"#f59e0b22",color:"#f59e0b",borderRadius:4,padding:"2px 6px",flexShrink:0,fontFamily:"monospace"}}>PARCELA</span>
+                    <span style={{fontSize:12,color:"#e2e8f0",flex:1}}>{e.desc} <span style={{color:"#64748b"}}>({pagas}/{parcelas})</span></span>
+                    <span style={{fontSize:11,color:diff<0?"#ef4444":"#f59e0b",fontWeight:600}}>{diff<0?`Atrasou ${Math.abs(diff)}d`:`Vence em ${diff}d`} · {formatBRL(Number(e.value)/parcelas)}</span>
+                  </div>);})}
+                </div>);
+              })()}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
                 {[{label:"Saldo Atual",value:totals.balance,color:totals.balance>=0?"#22c55e":"#ef4444",sub:"recebido − gastos − cachês pagos − reembolsos pagos"},{label:"Projetado Líquido",value:totals.projected,color:"#4D7CFE",sub:`após NF (${formatBRL(totals.totalNF)}) − todos os custos`},{label:"Clientes (total bruto)",value:totals.totalReceivables,color:"#34d399",sub:`${formatBRL(totals.received)} já recebido`},{label:"Gastos nos projetos",value:totals.totalProjExp+totals.totalCaches,color:"#f87171",sub:`${formatBRL(totals.cachesAPagar)} cachês a pagar`},{label:"Custo fixo mensal",value:totals.totalFixedMonthly,color:"#22d3ee",sub:`${formatBRL(totals.studioFixedMonthly)} estúdio · ${formatBRL(totals.subsFixedMonthly)} assinaturas`}].map(c=>(
                   <div key={c.label} className="premium-card" style={{background:"#0E0E12",border:"1px solid #1C1C22",borderRadius:10,padding:"18px 20px"}}>
@@ -964,11 +1023,26 @@ function AppContent({ onLogout, userEmail }) {
                 })()}
               </div>
               <div style={{background:"#101014",border:"1px solid #1C1C22",borderRadius:10,padding:"20px"}}>
-                <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:"#cbd5e1"}}>👥 Profissionais por cachê recebido</h3>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                  <h3 style={{margin:0,fontSize:14,fontWeight:600,color:"#cbd5e1"}}>👥 Profissionais por cachê recebido</h3>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{display:"flex",gap:2,background:"#050507",borderRadius:8,padding:3}}>
+                      {[{k:"geral",l:"Geral"},{k:"mensal",l:"Por mês"}].map(o=>(<button key={o.k} onClick={()=>setRankScope(o.k)} style={{padding:"5px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:rankScope===o.k?"#4D7CFE":"transparent",color:rankScope===o.k?"#fff":"#71717A"}}>{o.l}</button>))}
+                    </div>
+                    {rankScope==="mensal"&&<input type="month" value={rankMonth} onChange={e=>setRankMonth(e.target.value)} style={{background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"5px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/>}
+                  </div>
+                </div>
                 {(()=>{
+                  // No modo mensal, considera apenas cachês cujo trabalho (workDates)
+                  // ou pagamento (datePaid) caem no mês selecionado.
+                  const inMonth=(c)=>{
+                    if(rankScope==="geral")return true;
+                    const dates=[...(c.workDates||[]),c.dateWork,c.datePaid,c.dateDue].filter(Boolean);
+                    return dates.some(d=>String(d).slice(0,7)===rankMonth);
+                  };
                   const ranked = freelancers
                     .map(fl=>{
-                      const fc=caches.filter(c=>c.freelancerId===fl.id);
+                      const fc=caches.filter(c=>c.freelancerId===fl.id).filter(inMonth);
                       const total=fc.reduce((s,c)=>s+cacheTotal(c),0);
                       const pagos=fc.filter(c=>c.status==="pago").reduce((s,c)=>s+cacheTotal(c),0);
                       const aPagar=total-pagos;
@@ -976,7 +1050,7 @@ function AppContent({ onLogout, userEmail }) {
                     })
                     .filter(({total})=>total>0)
                     .sort((a,b)=>b.total-a.total);
-                  if(ranked.length===0) return <div style={{fontSize:12,color:"#475569"}}>Nenhum cachê lançado ainda.</div>;
+                  if(ranked.length===0) return <div style={{fontSize:12,color:"#475569"}}>{rankScope==="mensal"?`Nenhum cachê em ${monthLabel(rankMonth)}.`:"Nenhum cachê lançado ainda."}</div>;
                   return ranked.map(({fl,total,pagos,aPagar,jobs},i)=>{
                     const flIdx=freelancers.findIndex(f=>f.id===fl.id);
                     const cor=getColor(flIdx);
@@ -1393,7 +1467,7 @@ function AppContent({ onLogout, userEmail }) {
                           <Row><Input label="Nome" value={formFL.name} onChange={v=>setFormFL(p=>({...p,name:v}))}/><Input label="Apelido" value={formFL.apelido} onChange={v=>setFormFL(p=>({...p,apelido:v}))}/></Row>
                           <Row><Select label="Função" value={formFL.role} onChange={v=>setFormFL(p=>({...p,role:v}))} options={ROLES}/><Input label="💰 Cachê (R$)" type="number" value={formCache.value} onChange={v=>setFormCache(p=>({...p,value:v}))}/></Row>
                           <Input label="Descrição (opcional)" value={formCache.desc} onChange={v=>setFormCache(p=>({...p,desc:v}))}/>
-                          <AddBtn onClick={()=>{if(!formFL.name)return;const id=Date.now();setFreelancers(prev=>[...prev,{...formFL,id}]);if(formCache.value)setCaches(prev=>[...prev,{...formCache,id:Date.now()+1,freelancerId:id,jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0)}]);setFormFL(emptyFL);setFormCache(emptyCache);setShowNewFLForm(false);setShowAddFL(false);}} color={currentJobColor}>+ Cadastrar e adicionar</AddBtn>
+                          <AddBtn onClick={()=>{if(!formFL.name)return;const id=uid();setFreelancers(prev=>[...prev,{...formFL,id}]);if(formCache.value)setCaches(prev=>[...prev,{...formCache,id:uid(),freelancerId:id,jobId:selectedJob,value:Number(formCache.value),alimentacao:Number(formCache.alimentacao||0),logistica:Number(formCache.logistica||0)}]);setFormFL(emptyFL);setFormCache(emptyCache);setShowNewFLForm(false);setShowAddFL(false);}} color={currentJobColor}>+ Cadastrar e adicionar</AddBtn>
                         </div>
                       </div>
                     )}
@@ -1485,6 +1559,83 @@ function AppContent({ onLogout, userEmail }) {
           </div>
         )}
 
+        {/* ── DEMANDAS (kanban) ── */}
+        {tab==="demandas"&&(
+          <div>
+            <button onClick={()=>setShowAddDemand(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddDemand?"#101014":"#4D7CFE18",border:"1px solid #4D7CFE44",borderRadius:10,color:"#4D7CFE",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddDemand?"▲ Fechar":"＋ Nova demanda"}</button>
+            {showAddDemand&&(
+              <FormCard title="Nova Demanda" color="#4D7CFE">
+                <Input label="O que precisa ser feito" value={formDemand.desc} onChange={v=>setFormDemand(p=>({...p,desc:v}))}/>
+                <Row>
+                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Responsável</div>
+                    <select value={formDemand.responsavelId||""} onChange={e=>setFormDemand(p=>({...p,responsavelId:e.target.value?Number(e.target.value):""}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>
+                      <option value="">Sem responsável</option>
+                      {freelancers.map(f=><option key={f.id} value={f.id}>{f.apelido||f.name}</option>)}
+                    </select>
+                  </div>
+                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Job vinculado</div>
+                    <select value={formDemand.jobId||""} onChange={e=>setFormDemand(p=>({...p,jobId:e.target.value?Number(e.target.value):""}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>
+                      <option value="">Nenhum</option>
+                      {jobs.map(j=><option key={j.id} value={j.id}>{j.desc}</option>)}
+                    </select>
+                  </div>
+                </Row>
+                <Row>
+                  <Input label="⏰ Prazo" type="date" value={formDemand.prazo} onChange={v=>setFormDemand(p=>({...p,prazo:v}))}/>
+                  <div><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Prioridade</div>
+                    <div style={{display:"flex",gap:6}}>{Object.keys(DEMAND_PRIORITY).map(pr=>{const cor=DEMAND_PRIORITY[pr];const sel=formDemand.prioridade===pr;return(<button key={pr} onClick={()=>setFormDemand(p=>({...p,prioridade:pr}))} style={{flex:1,padding:"8px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",background:sel?cor:cor+"22",color:sel?"#fff":cor,border:`1px solid ${cor}55`}}>{pr}</button>);})}</div>
+                  </div>
+                </Row>
+                <Input label="Observações (opcional)" value={formDemand.notes} onChange={v=>setFormDemand(p=>({...p,notes:v}))}/>
+                <AddBtn onClick={addDemand} color="#4D7CFE">+ Criar demanda</AddBtn>
+              </FormCard>
+            )}
+            <div className="grid-3">
+              {DEMAND_STATUS.map(st=>{
+                const items=demands.filter(d=>d.status===st).sort((a,b)=>{const po={"alta":0,"média":1,"baixa":2};return (po[a.prioridade]??1)-(po[b.prioridade]??1);});
+                const stColor=st==="a fazer"?"#f59e0b":st==="fazendo"?"#4D7CFE":"#22c55e";
+                const stIcon=st==="a fazer"?"○":st==="fazendo"?"◐":"●";
+                return(<div key={st} style={{background:"#0C0C10",border:"1px solid #18181D",borderRadius:10,padding:12,minHeight:200}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,padding:"0 4px"}}>
+                    <span className="mono" style={{fontSize:11,color:stColor,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase"}}>{stIcon} {st}</span>
+                    <span className="mono" style={{fontSize:11,color:"#52525B"}}>{items.length}</span>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {items.length===0&&<div style={{fontSize:11,color:"#3F3F46",textAlign:"center",padding:"20px 0"}}>Vazio</div>}
+                    {items.map(d=>{
+                      const resp=freelancers.find(f=>f.id===d.responsavelId);
+                      const respIdx=freelancers.findIndex(f=>f.id===d.responsavelId);
+                      const respCor=resp?getColor(respIdx):"#52525B";
+                      const job=jobs.find(j=>j.id===d.jobId);
+                      const atrasada=d.prazo&&d.status!=="feito"&&d.prazo<today();
+                      const prCor=DEMAND_PRIORITY[d.prioridade]||"#f59e0b";
+                      return(<div key={d.id} style={{background:"#101014",border:`1px solid ${atrasada?"#ef444455":"#1C1C22"}`,borderRadius:8,padding:"10px 12px"}}>
+                        <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                          <div style={{width:4,alignSelf:"stretch",background:prCor,borderRadius:2,flexShrink:0}}/>
+                          <div style={{flex:1,fontSize:13,fontWeight:500,color:d.status==="feito"?"#71717A":"#e2e8f0",textDecoration:d.status==="feito"?"line-through":"none"}}>{d.desc}</div>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:10,color:"#64748b",paddingLeft:12}}>
+                          {resp&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:16,height:16,borderRadius:"50%",background:respCor+"33",border:`1px solid ${respCor}`,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:respCor}}>{(resp.apelido||resp.name)[0]}</span>{resp.apelido||resp.name.split(" ")[0]}</span>}
+                          {job&&<span style={{color:"#4D7CFE"}}>🎬 {job.desc}</span>}
+                          {d.prazo&&<span style={{color:atrasada?"#ef4444":"#64748b",fontWeight:atrasada?700:400}}>⏰ {d.prazo}{atrasada?" (atrasada)":""}</span>}
+                        </div>
+                        {d.notes&&<div style={{fontSize:10,color:"#52525B",marginTop:4,paddingLeft:12}}>{d.notes}</div>}
+                        <div style={{display:"flex",gap:4,marginTop:8,paddingLeft:12}}>
+                          {st!=="a fazer"&&<button onClick={()=>moveDemand(d.id,-1)} title="Mover para trás" style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:11,borderRadius:5,padding:"3px 10px"}}>‹</button>}
+                          {st!=="feito"&&<button onClick={()=>moveDemand(d.id,1)} title="Avançar" style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",cursor:"pointer",fontSize:11,borderRadius:5,padding:"3px 10px",fontWeight:700}}>›</button>}
+                          <div style={{flex:1}}/>
+                          <button onClick={()=>startEdit("demand",d)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:11,borderRadius:5,padding:"3px 8px"}}>✏️</button>
+                          <button onClick={()=>removeDemand(d.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:13}}>✕</button>
+                        </div>
+                      </div>);
+                    })}
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── PROFISSIONAIS ── */}
         {tab==="profissionais"&&(
           <div>
@@ -1493,7 +1644,7 @@ function AppContent({ onLogout, userEmail }) {
               <Row><Input label="WhatsApp" value={formFL.phone} onChange={v=>setFormFL(p=>({...p,phone:v}))}/><Input label="E-mail" value={formFL.email} onChange={v=>setFormFL(p=>({...p,email:v}))}/></Row>
               <Row><Select label="Função" value={formFL.role} onChange={v=>setFormFL(p=>({...p,role:v}))} options={ROLES}/><Input label="Nascimento" value={formFL.nasc} onChange={v=>setFormFL(p=>({...p,nasc:v}))}/></Row>
               <Row><Input label="CPF" value={formFL.cpf} onChange={v=>setFormFL(p=>({...p,cpf:v}))}/><Input label="RG" value={formFL.rg} onChange={v=>setFormFL(p=>({...p,rg:v}))}/></Row>
-              <AddBtn onClick={()=>{if(!formFL.name)return;setFreelancers(p=>[...p,{...formFL,id:Date.now()}]);setFormFL(emptyFL);}} color="#4D7CFE">+ Cadastrar</AddBtn>
+              <AddBtn onClick={()=>{if(!formFL.name)return;setFreelancers(p=>[...p,{...formFL,id:uid()}]);setFormFL(emptyFL);}} color="#4D7CFE">+ Cadastrar</AddBtn>
             </FormCard>
             {freelancers.length===0&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhum profissional cadastrado ainda.</div>}
             {freelancers.length>0&&(
@@ -1649,11 +1800,16 @@ function AppContent({ onLogout, userEmail }) {
                           <span style={{fontSize:11,color:"#f59e0b"}}>⏳ {formatBRL(falta)} falta</span>
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
                         <div style={{flex:1,height:6,background:"#050507",borderRadius:3,overflow:"hidden"}}><div style={{width:`${(pagas/parcelas)*100}%`,height:"100%",background:"linear-gradient(90deg,#22c55e,#4ade80)",borderRadius:3}}/></div>
                         <button onClick={()=>setExpenses(p=>p.map(e=>e.id===item.id?{...e,parcelasPagas:String(Math.max(0,pagas-1)),status:(pagas-1>=parcelas)?"pago":"a pagar"}:e))} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:14,borderRadius:6,padding:"2px 10px",fontWeight:700}}>−</button>
                         <button onClick={()=>setExpenses(p=>p.map(e=>e.id===item.id?{...e,parcelasPagas:String(Math.min(parcelas,pagas+1)),status:(pagas+1>=parcelas)?"pago":"a pagar"}:e))} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",cursor:"pointer",fontSize:14,borderRadius:6,padding:"2px 10px",fontWeight:700}}>+</button>
                       </div>
+                      {(()=>{const dates=item.parcelaDates||[];const nextDate=dates[pagas];const remaining=dates.slice(pagas);if(!nextDate)return null;return(<div style={{fontSize:10,color:"#64748b",display:"flex",flexWrap:"wrap",gap:4}}>
+                        <span style={{color:"#f59e0b",fontWeight:600}}>Próxima: {nextDate}</span>
+                        {remaining.length>1&&remaining.slice(1,4).map((d,i)=><span key={i} style={{background:"#ffffff08",borderRadius:4,padding:"1px 6px"}}>{d}</span>)}
+                        {remaining.length>4&&<span style={{color:"#475569"}}>+{remaining.length-4} mais</span>}
+                      </div>);})()}
                     </div>
                   )}
                 </div>);
@@ -1669,26 +1825,56 @@ function AppContent({ onLogout, userEmail }) {
             <button onClick={()=>setShowAddStudio(v=>!v)} style={{width:"100%",padding:"12px",marginBottom:16,background:showAddStudio?"#101014":"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:10,color:"#22d3ee",fontWeight:600,fontSize:13,cursor:"pointer"}}>{showAddStudio?"▲ Fechar":"＋ Adicionar despesa fixa"}</button>
             {showAddStudio&&(
               <FormCard title="Nova Despesa do Estúdio" color="#22d3ee">
-                <Input label="Descrição (ex: Aluguel da sala)" value={formStudio.desc} onChange={v=>setFormStudio(p=>({...p,desc:v}))}/>
-                <Row><Input label="Valor mensal (R$)" type="number" value={formStudio.value} onChange={v=>setFormStudio(p=>({...p,value:v}))}/><Select label="Categoria" value={formStudio.category} onChange={v=>setFormStudio(p=>({...p,category:v}))} options={STUDIO_CATEGORIES}/></Row>
+                <Input label="Descrição (ex: Conta de luz)" value={formStudio.desc} onChange={v=>setFormStudio(p=>({...p,desc:v}))}/>
+                <Row><Input label="Valor deste mês (R$)" type="number" value={formStudio.value} onChange={v=>setFormStudio(p=>({...p,value:v}))}/><Select label="Categoria" value={formStudio.category} onChange={v=>setFormStudio(p=>({...p,category:v}))} options={STUDIO_CATEGORIES}/></Row>
                 <Row><Input label="Dia do vencimento (1-31)" type="number" value={formStudio.dayOfMonth} onChange={v=>setFormStudio(p=>({...p,dayOfMonth:v}))}/><Input label="Ativo desde" type="date" value={formStudio.dateStart} onChange={v=>setFormStudio(p=>({...p,dateStart:v}))}/></Row>
+                <p style={{fontSize:11,color:"#475569",margin:0}}>💡 Estas despesas se repetem todo mês mas o valor pode variar. Depois de criar, você lança o valor de cada mês no histórico.</p>
                 <AddBtn onClick={addStudioExpense} color="#22d3ee">+ Adicionar</AddBtn>
               </FormCard>
             )}
-            {studioExpenses.length>0&&<SummaryPill label="Total fixo mensal do estúdio" value={studioExpenses.filter(e=>e.active!==false).reduce((s,e)=>s+Number(e.value),0)} color="#22d3ee"/>}
+            {studioExpenses.length>0&&<SummaryPill label="Total do mês mais recente de cada despesa" value={studioExpenses.filter(e=>e.active!==false).reduce((s,e)=>s+studioLatestValue(e),0)} color="#22d3ee"/>}
             {studioExpenses.length===0&&!showAddStudio&&<div style={{textAlign:"center",color:"#475569",padding:30,fontSize:13}}>Nenhuma despesa fixa cadastrada ainda.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {studioExpenses.map(item=>(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,opacity:item.active===false?0.5:1}}>
-                <span style={{fontSize:18}}>🏢</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
-                  <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.dayOfMonth&&` · vence dia ${item.dayOfMonth}`}{item.active===false&&<span style={{color:"#f59e0b"}}> · inativo</span>}</div>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(item.value)}<span style={{fontSize:10,color:"#64748b",fontWeight:400}}>/mês</span></div>
-                <button onClick={()=>setStudioExpenses(p=>p.map(e=>e.id===item.id?{...e,active:e.active===false?true:false}:e))} style={{background:item.active===false?"#64748b22":"#22c55e22",color:item.active===false?"#64748b":"#22c55e",border:`1px solid ${item.active===false?"#64748b44":"#22c55e44"}`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.active===false?"inativo":"ativo"}</button>
-                <button onClick={()=>startEdit("studio",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
-                <button onClick={()=>removeStudioExpense(item.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
-              </div>))}
+              {studioExpenses.map(item=>{
+                const isExp=expandedStudio===item.id;
+                const latestMonth=studioLatestMonth(item);
+                const months=Object.keys(item.monthly||{}).sort().reverse();
+                return(<div key={item.id} style={{background:"#101014",border:"1px solid #18181D",borderRadius:10,padding:"14px 16px",opacity:item.active===false?0.5:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:18}}>🏢</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:500,color:"#e2e8f0"}}>{item.desc}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{item.category}{item.dayOfMonth&&` · vence dia ${item.dayOfMonth}`}{latestMonth&&<span> · último: {monthLabel(latestMonth)}</span>}{item.active===false&&<span style={{color:"#f59e0b"}}> · inativo</span>}</div>
+                    </div>
+                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{formatBRL(studioLatestValue(item))}<span style={{fontSize:10,color:"#64748b",fontWeight:400}}>/mês</span></div>
+                    <button onClick={()=>{setExpandedStudio(isExp?null:item.id);setNewMonthKey(today().slice(0,7));setNewMonthVal("");}} title="Histórico mensal" style={{background:isExp?"#22d3ee22":"#ffffff10",border:"none",color:isExp?"#22d3ee":"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 10px"}}>📅 {months.length}</button>
+                    <button onClick={()=>setStudioExpenses(p=>p.map(e=>e.id===item.id?{...e,active:e.active===false?true:false}:e))} style={{background:item.active===false?"#64748b22":"#22c55e22",color:item.active===false?"#64748b":"#22c55e",border:`1px solid ${item.active===false?"#64748b44":"#22c55e44"}`,borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{item.active===false?"inativo":"ativo"}</button>
+                    <button onClick={()=>startEdit("studio",item)} style={{background:"#ffffff10",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:13,borderRadius:6,padding:"4px 8px"}}>✏️</button>
+                    <button onClick={()=>removeStudioExpense(item.id)} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:16}}>✕</button>
+                  </div>
+                  {isExp&&(
+                    <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #ffffff08"}}>
+                      <div style={{fontSize:11,color:"#64748b",marginBottom:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px"}}>Histórico mensal</div>
+                      <div style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:12,flexWrap:"wrap"}}>
+                        <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Mês</div><input type="month" value={newMonthKey} onChange={e=>setNewMonthKey(e.target.value)} style={{background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                        <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Valor (R$)</div><input type="number" value={newMonthVal} onChange={e=>setNewMonthVal(e.target.value)} placeholder="0,00" style={{width:110,background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:12,outline:"none"}}/></div>
+                        <button onClick={()=>{if(newMonthKey&&newMonthVal!==""){setStudioMonthValue(item.id,newMonthKey,newMonthVal);setNewMonthVal("");}}} style={{background:"#22d3ee",color:"#000",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Lançar mês</button>
+                      </div>
+                      {months.length===0&&<div style={{fontSize:12,color:"#475569"}}>Nenhum mês lançado ainda.</div>}
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {months.map(mk=>(<div key={mk} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A0A0D",borderRadius:8,padding:"8px 12px"}}>
+                          <span style={{fontSize:13,color:"#cbd5e1"}}>{monthLabel(mk)}</span>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <span className="mono" style={{fontSize:14,fontWeight:600,color:"#22d3ee"}}>{formatBRL(item.monthly[mk])}</span>
+                            <button onClick={()=>setStudioMonthValue(item.id,mk,"")} style={{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:14}}>✕</button>
+                          </div>
+                        </div>))}
+                      </div>
+                      {months.length>1&&<div style={{marginTop:10,fontSize:11,color:"#64748b"}}>Média: <span className="mono" style={{color:"#94a3b8",fontWeight:600}}>{formatBRL(months.reduce((s,mk)=>s+Number(item.monthly[mk]),0)/months.length)}</span></div>}
+                    </div>
+                  )}
+                </div>);
+              })}
             </div>
           </div>
         )}
