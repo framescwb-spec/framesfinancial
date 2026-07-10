@@ -840,7 +840,7 @@ function AppContent({ onLogout, userEmail }) {
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
         setJobs(p=>p.map(i=>i.id===editData.id?{...editData,value:Number(editData.value),valorRecebido:Number(editData.valorRecebido||0),nfRate:Number(editData.nfRate),produtoraRate:Number(editData.produtoraRate||0),workDates:wd,dateWork:wd[0]||editData.dateWork||""}:i));
         setEditingId(null);setEditData({});
-      }} onCancel={cancelEdit} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"produtoraRate",label:"💼 % que fica para a produtora",type:"number"},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
+      }} onCancel={cancelEdit} linkedDates={["dateDelivery","dateDueExpected","dateReceived"]} fields={[{key:"desc",label:"Nome do projeto/job"},{key:"value",label:"Valor total (R$)",type:"number"},{key:"nfRate",label:"Nota Fiscal",type:"select",options:[{value:0,label:"Sem NF"},{value:0.06,label:"6%"},{value:0.12,label:"12%"}]},{key:"produtoraRate",label:"💼 % que fica para a produtora",type:"number"},{key:"contrato",label:"Nº contrato / link proposta"},{key:"notes",label:"Observações"},{key:"workDatesText",label:"📅 Diárias (datas separadas por vírgula, ex: 2026-07-01, 2026-07-02)"},{key:"dateDelivery",label:"📦 Entrega do material",type:"date"},{key:"dateInvoice",label:"🧾 Faturamento (NF emitida)",type:"date"},{key:"dateDueExpected",label:"💰 Previsão de recebimento",type:"date"},{key:"dateReceived",label:"✅ Recebido em (data real)",type:"date"},{key:"status",label:"Status",type:"select",options:JOB_STATUS}]}/>}
       {editingId&&editingId.startsWith("reimb:")&&<EditModal editData={editData} setEditData={setEditData} color="#fb923c" onSave={()=>saveEdit("reimb",setReimbursements)} onCancel={cancelEdit} fields={[{key:"pessoa",label:"Pessoa"},{key:"desc",label:"Descrição"},{key:"value",label:"Valor (R$)",type:"number"},{key:"devolvidoPara",label:"Devolvido para",type:"select",options:REIMB_SOURCES},{key:"datePay",label:"Data de pagamento",type:"date"},{key:"status",label:"Status",type:"select",options:["pendente","recebido"]}]}/>}
       {editingId&&editingId.startsWith("cache:")&&<EditModal editData={editData} setEditData={setEditData} color="#4D7CFE" onSave={()=>{
         const wd=(editData.workDatesText||"").split(",").map(s=>s.trim()).filter(Boolean).sort();
@@ -1285,8 +1285,8 @@ function AppContent({ onLogout, userEmail }) {
                     }} style={{background:"#4D7CFE",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Adicionar diária</button>
                   </div>
                 </div>
-                <Row><Input label="📦 Entrega do material" type="date" value={formJob.dateDelivery} onChange={v=>setFormJob(p=>({...p,dateDelivery:v}))}/><Input label="🧾 Faturamento (NF)" type="date" value={formJob.dateInvoice} onChange={v=>setFormJob(p=>({...p,dateInvoice:v}))}/></Row>
-                <Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>({...p,dateDueExpected:v}))}/>
+                <Row><Input label="📦 Entrega do material" type="date" value={formJob.dateDelivery} onChange={v=>setFormJob(p=>{const n={...p,dateDelivery:v};if(v){if(!p.dateDueExpected)n.dateDueExpected=v;if(!p.dateReceived)n.dateReceived=v;}return n;})}/><Input label="🧾 Faturamento (NF)" type="date" value={formJob.dateInvoice} onChange={v=>setFormJob(p=>({...p,dateInvoice:v}))}/></Row>
+                <Input label="💰 Previsão de recebimento" type="date" value={formJob.dateDueExpected} onChange={v=>setFormJob(p=>{const n={...p,dateDueExpected:v};if(v){if(!p.dateDelivery)n.dateDelivery=v;if(!p.dateReceived)n.dateReceived=v;}return n;})}/>
                 <Row>
                   <div><div style={{fontSize:11,color:"#64748b",marginBottom:8}}>Nota Fiscal</div>
                     <div style={{display:"flex",gap:4,background:"#050507",borderRadius:8,padding:4}}>
@@ -2054,7 +2054,18 @@ export default function App() {
 
 
 
-function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE"}){
+function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE",linkedDates}){
+  // linkedDates: array de keys de data que se auto-preenchem entre si.
+  // Ao preencher uma, as outras do grupo que estiverem vazias recebem o mesmo valor.
+  const handleChange=(key,val)=>{
+    setEditData(p=>{
+      const n={...p,[key]:val};
+      if(linkedDates&&linkedDates.includes(key)&&val){
+        linkedDates.forEach(k=>{ if(k!==key && !p[k]) n[k]=val; });
+      }
+      return n;
+    });
+  };
   return(
     <div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:"#101014",border:`1px solid ${color}44`,borderRadius:12,padding:24,width:"100%",maxWidth:460,maxHeight:"85vh",overflowY:"auto"}}>
@@ -2062,9 +2073,9 @@ function EditModal({fields,editData,setEditData,onSave,onCancel,color="#4D7CFE"}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {fields.map(f=>(f.type==="select"
             ?<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <select value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
+              <select value={editData[f.key]||""} onChange={e=>handleChange(f.key,e.target.value)} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none"}}>{f.options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select></div>
             :<div key={f.key}><div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{f.label}</div>
-              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>setEditData(p=>({...p,[f.key]:e.target.value}))} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+              <input type={f.type||"text"} value={editData[f.key]||""} onChange={e=>handleChange(f.key,e.target.value)} style={{width:"100%",background:"#050507",border:"1px solid #ffffff15",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
           ))}
         </div>
         <div style={{display:"flex",gap:8,marginTop:16}}>
